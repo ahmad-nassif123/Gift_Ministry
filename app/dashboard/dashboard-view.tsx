@@ -216,7 +216,6 @@ export function DashboardView() {
         giftTier: product.giftTier ?? "standard",
         images: Array.isArray(product.images) ? product.images : [],
         availableQuantity: product.availableQuantity ?? 0,
-        category: product.category,
         price: product.price,
       };
       const response = await fetch("/api/products", {
@@ -288,7 +287,6 @@ export function DashboardView() {
           return {
             "كود المنتج": p.sku ?? "",
             "اسم المنتج": p.name ?? "",
-            "التصنيف": p.category ?? "",
             "الكمية الحالية": p.availableQuantity ?? "",
           };
         });
@@ -297,7 +295,6 @@ export function DashboardView() {
         header: [
           "كود المنتج",
           "اسم المنتج",
-          "التصنيف",
           "الكمية الحالية",
         ],
         skipHeader: false,
@@ -306,7 +303,6 @@ export function DashboardView() {
       ws["!cols"] = [
         { wch: 12 },
         { wch: 30 },
-        { wch: 18 },
         { wch: 14 },
       ];
 
@@ -372,7 +368,7 @@ export function DashboardView() {
       const sampleKeys = Object.keys(rows[0]).map(normalizeKey);
       if (!sampleKeys.includes("كود المنتج") || !sampleKeys.includes("الكمية الحالية")) {
         notifyError(
-          "صيغة الملف غير متطابقة مع تصدير الهدايا.\nالمطلوب وجود الأعمدة: كود المنتج، اسم المنتج، التصنيف، الكمية الحالية."
+          "صيغة الملف غير متطابقة مع تصدير الهدايا.\nالمطلوب وجود الأعمدة: كود المنتج، اسم المنتج، الكمية الحالية."
         );
         return;
       }

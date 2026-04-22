@@ -76,7 +76,6 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
         giftTier: product.giftTier,
         images: product.images,
         availableQuantity: product.availableQuantity || 0,
-        category: product.category,
         price: product.price,
         archived: product.archived,
       });

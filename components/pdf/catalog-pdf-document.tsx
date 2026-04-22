@@ -148,15 +148,14 @@ export function CatalogPDFDocument({
   const baseUrl = (options?.baseUrl ?? "").replace(/\/+$/, "");
   const rowsPerPage = options?.rowsPerPage ?? (showQr ? 14 : 28);
 
-  const colSimple = { idx: "7%", sku: "18%", tier: "18%", cat: "17%", name: "40%" };
+  const colSimple = { idx: "8%", sku: "20%", tier: "20%", name: "52%" };
   const colLuxury = {
     idx: "5%",
     qr: "11%",
     qty: "9%",
     sku: "13%",
     tier: "13%",
-    cat: "14%",
-    name: "35%",
+    name: "49%",
   };
 
   const pages = chunkArray(products, rowsPerPage);
@@ -215,7 +214,6 @@ export function CatalogPDFDocument({
                   <Text style={[styles.th, { width: colLuxury.qty }]}>الكمية</Text>
                   <Text style={[styles.th, { width: colLuxury.sku }]}>الكود</Text>
                   <Text style={[styles.th, { width: colLuxury.tier }]}>التصنيف</Text>
-                  <Text style={[styles.th, { width: colLuxury.cat }]}>الفئة</Text>
                   <Text style={[styles.th, { width: colLuxury.name, textAlign: "right" }]}>اسم الهدية</Text>
                 </>
               ) : showQuantity ? (
@@ -224,7 +222,6 @@ export function CatalogPDFDocument({
                   <Text style={[styles.th, { width: "12%" }]}>الكمية</Text>
                   <Text style={[styles.th, { width: colSimple.sku }]}>الكود</Text>
                   <Text style={[styles.th, { width: colSimple.tier }]}>التصنيف</Text>
-                  <Text style={[styles.th, { width: colSimple.cat }]}>الفئة</Text>
                   <Text style={[styles.th, { width: "36%", textAlign: "right" }]}>اسم الهدية</Text>
                 </>
               ) : (
@@ -232,7 +229,6 @@ export function CatalogPDFDocument({
                   <Text style={[styles.th, { width: colSimple.idx }]}>#</Text>
                   <Text style={[styles.th, { width: colSimple.sku }]}>الكود</Text>
                   <Text style={[styles.th, { width: colSimple.tier }]}>التصنيف</Text>
-                  <Text style={[styles.th, { width: colSimple.cat }]}>الفئة</Text>
                   <Text style={[styles.th, { width: colSimple.name, textAlign: "right" }]}>اسم الهدية</Text>
                 </>
               )}
@@ -257,7 +253,6 @@ export function CatalogPDFDocument({
                       <Text style={[styles.td, { width: colLuxury.qty }]}>{qtyLabel(p)}</Text>
                       <Text style={[styles.td, { width: colLuxury.sku }]}>{p.sku || "—"}</Text>
                       <Text style={[styles.td, { width: colLuxury.tier }]}>{tierLabel(p)}</Text>
-                      <Text style={[styles.td, { width: colLuxury.cat }]}>{p.category || "—"}</Text>
                       <Text style={[styles.td, styles.tdName, { width: colLuxury.name }]}>{p.name}</Text>
                     </>
                   ) : showQuantity ? (
@@ -266,7 +261,6 @@ export function CatalogPDFDocument({
                       <Text style={[styles.td, { width: "12%" }]}>{qtyLabel(p)}</Text>
                       <Text style={[styles.td, { width: colSimple.sku }]}>{p.sku || "—"}</Text>
                       <Text style={[styles.td, { width: colSimple.tier }]}>{tierLabel(p)}</Text>
-                      <Text style={[styles.td, { width: colSimple.cat }]}>{p.category || "—"}</Text>
                       <Text style={[styles.td, styles.tdName, { width: "36%" }]}>{p.name}</Text>
                     </>
                   ) : (
@@ -274,7 +268,6 @@ export function CatalogPDFDocument({
                       <Text style={[styles.td, { width: colSimple.idx }]}>{globalIndex + 1}</Text>
                       <Text style={[styles.td, { width: colSimple.sku }]}>{p.sku || "—"}</Text>
                       <Text style={[styles.td, { width: colSimple.tier }]}>{tierLabel(p)}</Text>
-                      <Text style={[styles.td, { width: colSimple.cat }]}>{p.category || "—"}</Text>
                       <Text style={[styles.td, styles.tdName, { width: colSimple.name }]}>{p.name}</Text>
                     </>
                   )}

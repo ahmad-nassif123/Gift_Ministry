@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
       giftTier: (body.giftTier as GiftTier) || "standard",
       images: Array.isArray(body.images) ? body.images : [],
       availableQuantity: body.availableQuantity ?? 0,
-      category: body.category,
       price: body.price,
     };
     await ensureProductsTable();
@@ -135,7 +134,6 @@ export async function PUT(request: NextRequest) {
       giftTier: body.giftTier,
       images: body.images,
       availableQuantity: body.availableQuantity,
-      category: body.category,
       price: body.price,
       archived: body.archived,
       hidden: body.hidden,
