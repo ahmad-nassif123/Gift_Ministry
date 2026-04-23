@@ -39,8 +39,6 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
   const [imageLinkOpen, setImageLinkOpen] = useState(false);
   const [imageLinkDraft, setImageLinkDraft] = useState("");
   const [catalogUploading, setCatalogUploading] = useState(false);
-  const [catalogLinkOpen, setCatalogLinkOpen] = useState(false);
-  const [catalogLinkDraft, setCatalogLinkDraft] = useState("");
 
   const giftTiers = getAllGiftTiers();
 
@@ -221,21 +219,6 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
       setCatalogUploading(false);
       e.target.value = "";
     }
-  };
-
-  const openCatalogLinkDialog = () => {
-    setCatalogLinkDraft(formData.catalogImage || "");
-    setCatalogLinkOpen(true);
-  };
-
-  const confirmCatalogLink = () => {
-    const t = catalogLinkDraft.trim();
-    if (!t) {
-      notifyError("يرجى إدخال رابط صورة الكتالوج.");
-      return;
-    }
-    setFormData({ ...formData, catalogImage: t });
-    setCatalogLinkOpen(false);
   };
 
   const clearCatalogImage = () => {
@@ -494,14 +477,6 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
                   {catalogUploading ? "جاري الرفع..." : "رفع صورة الكتالوج"}
                 </div>
               </label>
-              <Button
-                type="button"
-                onClick={openCatalogLinkDialog}
-                variant="outline"
-                disabled={catalogUploading}
-              >
-                إضافة/تعديل رابط الكتالوج
-              </Button>
               {formData.catalogImage ? (
                 <Button type="button" onClick={clearCatalogImage} variant="outline">
                   إزالة
@@ -585,35 +560,6 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
           </Button>
           <Button type="button" onClick={confirmImageLink}>
             إضافة
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <Dialog open={catalogLinkOpen} onOpenChange={setCatalogLinkOpen}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>رابط صورة الكتالوج للطباعة</DialogTitle>
-        </DialogHeader>
-        <Input
-          value={catalogLinkDraft}
-          onChange={(e) => setCatalogLinkDraft(e.target.value)}
-          placeholder="https://..."
-          dir="ltr"
-          className="text-left font-mono text-sm"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              confirmCatalogLink();
-            }
-          }}
-        />
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => setCatalogLinkOpen(false)}>
-            إلغاء
-          </Button>
-          <Button type="button" onClick={confirmCatalogLink}>
-            حفظ
           </Button>
         </DialogFooter>
       </DialogContent>

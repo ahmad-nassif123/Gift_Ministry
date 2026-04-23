@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { X, ChevronRight, ChevronLeft } from "lucide-react";
 
@@ -14,17 +14,39 @@ interface ImageLightboxProps {
 }
 
 export function ImageLightbox({ images, currentIndex, onClose, onPrev, onNext, productName }: ImageLightboxProps) {
+  const pushedHistoryRef = useRef(false);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowRight") onNext();
       if (e.key === "ArrowLeft") onPrev();
     };
+
+    // اجعل زر الرجوع (Back) يغلق المعاينة بدل التنقل خارج صفحة المنتج
+    const handlePopState = () => {
+      onClose();
+    };
+
     document.addEventListener("keydown", handleKey);
     document.body.style.overflow = "hidden";
+
+    try {
+      window.history.pushState({ giftCatalogLightbox: true }, "", window.location.href);
+      pushedHistoryRef.current = true;
+      window.addEventListener("popstate", handlePopState);
+    } catch {
+      // ignore
+    }
+
     return () => {
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
+      try {
+        window.removeEventListener("popstate", handlePopState);
+      } catch {
+        // ignore
+      }
     };
   }, [onClose, onPrev, onNext]);
 
@@ -32,17 +54,29 @@ export function ImageLightbox({ images, currentIndex, onClose, onPrev, onNext, p
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < images.length - 1;
 
+  const requestClose = () => {
+    if (pushedHistoryRef.current) {
+      try {
+        window.history.back();
+        return;
+      } catch {
+        // ignore
+      }
+    }
+    onClose();
+  };
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={requestClose}
       role="dialog"
       aria-modal="true"
       aria-label="معرض الصور"
     >
       <button
         type="button"
-        onClick={onClose}
+        onClick={requestClose}
         className="absolute left-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
         aria-label="إغلاق"
       >
