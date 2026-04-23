@@ -17,6 +17,7 @@ export async function ensureProductsTable(): Promise<void> {
         contents JSONB NOT NULL DEFAULT '[]',
         gift_tier VARCHAR(32) NOT NULL DEFAULT 'standard',
         images JSONB NOT NULL DEFAULT '[]',
+        catalog_image TEXT,
         available_quantity INTEGER NOT NULL DEFAULT 0,
         price VARCHAR(64),
         archived BOOLEAN NOT NULL DEFAULT false,
@@ -32,6 +33,11 @@ export async function ensureProductsTable(): Promise<void> {
     }
     try {
       await sql`ALTER TABLE products ADD COLUMN hidden BOOLEAN NOT NULL DEFAULT false`;
+    } catch {
+      /* العمود موجود مسبقاً */
+    }
+    try {
+      await sql`ALTER TABLE products ADD COLUMN catalog_image TEXT`;
     } catch {
       /* العمود موجود مسبقاً */
     }
@@ -57,6 +63,7 @@ function rowToProduct(r: Record<string, unknown>): Product {
     contents: Array.isArray(r.contents) ? r.contents.map(String) : [],
     giftTier: (r.gift_tier as GiftTier) || "standard",
     images: Array.isArray(r.images) ? r.images.map(String) : [],
+    catalogImage: r.catalog_image != null ? String((r as any).catalog_image) : undefined,
     availableQuantity: typeof r.available_quantity === "number" ? r.available_quantity : 0,
     price: r.price != null ? String(r.price) : undefined,
     archived: Boolean(r.archived),
@@ -81,7 +88,7 @@ export async function seedProductsIfEmpty(): Promise<number> {
   for (const p of initialProducts) {
     if (suppressed.has(p.slug)) continue;
     await sql`
-      INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, available_quantity, price, updated_at)
+      INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, updated_at)
       VALUES (
         ${p.slug},
         ${p.sku},
@@ -90,6 +97,7 @@ export async function seedProductsIfEmpty(): Promise<number> {
         ${JSON.stringify(p.contents ?? [])}::jsonb,
         ${p.giftTier},
         ${JSON.stringify(p.images ?? [])}::jsonb,
+        ${p.catalogImage ?? null},
         ${p.availableQuantity ?? 0},
         ${p.price ?? null},
         NOW()
@@ -111,7 +119,7 @@ export async function syncInitialProducts(): Promise<void> {
   for (const p of initialProducts) {
     if (suppressed.has(p.slug)) continue;
     await sql`
-      INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, available_quantity, price, updated_at)
+      INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, updated_at)
       VALUES (
         ${p.slug},
         ${p.sku},
@@ -120,6 +128,7 @@ export async function syncInitialProducts(): Promise<void> {
         ${JSON.stringify(p.contents ?? [])}::jsonb,
         ${p.giftTier},
         ${JSON.stringify(p.images ?? [])}::jsonb,
+        ${p.catalogImage ?? null},
         ${p.availableQuantity ?? 0},
         ${p.price ?? null},
         NOW()
@@ -177,7 +186,7 @@ export async function createProduct(p: Product): Promise<Product> {
   await ensureProductsTable();
   await sql`DELETE FROM catalog_slug_suppressions WHERE slug = ${p.slug}`;
   await sql`
-    INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, available_quantity, price, archived, hidden, updated_at)
+    INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, archived, hidden, updated_at)
     VALUES (
       ${p.slug},
       ${p.sku},
@@ -186,6 +195,7 @@ export async function createProduct(p: Product): Promise<Product> {
       ${JSON.stringify(p.contents ?? [])}::jsonb,
       ${p.giftTier},
       ${JSON.stringify(p.images ?? [])}::jsonb,
+      ${p.catalogImage ?? null},
       ${p.availableQuantity ?? 0},
       ${p.price ?? null},
       ${p.archived ?? false},
@@ -209,6 +219,7 @@ export async function updateProduct(slug: string, updates: Partial<Product>): Pr
     updates.contents !== undefined ? JSON.stringify(updates.contents ?? []) : null;
   const giftTier = updates.giftTier !== undefined ? updates.giftTier : null;
   const imagesJson = updates.images !== undefined ? JSON.stringify(updates.images ?? []) : null;
+  const catalogImage = updates.catalogImage !== undefined ? updates.catalogImage : null;
   const qty = updates.availableQuantity !== undefined ? updates.availableQuantity : null;
   const price = updates.price !== undefined ? updates.price : null;
   const archived = updates.archived !== undefined ? updates.archived : null;
@@ -222,6 +233,7 @@ export async function updateProduct(slug: string, updates: Partial<Product>): Pr
       contents = COALESCE(${contentsJson}::jsonb, p.contents),
       gift_tier = COALESCE(${giftTier}, p.gift_tier),
       images = COALESCE(${imagesJson}::jsonb, p.images),
+      catalog_image = COALESCE(${catalogImage}, p.catalog_image),
       available_quantity = COALESCE(${qty}, p.available_quantity),
       price = COALESCE(${price}, p.price),
       archived = COALESCE(${archived}, p.archived),

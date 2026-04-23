@@ -141,6 +141,7 @@ export default function ProductPage({ params }: ProductPageProps) {
   if (!product) {
     return null;
   }
+  const isOnRecommendation = (product.availableQuantity ?? 0) === 0;
 
   // Get related products (same gift tier, excluding current)
   const relatedProducts = allProducts
@@ -300,7 +301,15 @@ export default function ProductPage({ params }: ProductPageProps) {
                   </div>
                   <div className="space-y-1 text-base text-muted-foreground">
                     <p>كود الهدية: <span className="font-semibold">{product.sku}</span></p>
-                    <p>العدد المتوفر: <span className="font-semibold">{product.availableQuantity ?? 0}</span></p>
+                    <p>
+                      العدد المتوفر:{" "}
+                      <span className="font-semibold">{product.availableQuantity ?? 0}</span>
+                      {isOnRecommendation ? (
+                        <span className="mr-2 inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-sm text-foreground">
+                          على التوصية
+                        </span>
+                      ) : null}
+                    </p>
                   </div>
                 </div>
 
@@ -331,53 +340,91 @@ export default function ProductPage({ params }: ProductPageProps) {
 
                 <Separator />
 
-                <div className="space-y-3">
-                  <p className="text-base font-medium text-muted-foreground">أضف للطلبية</p>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-1 border rounded-md">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="min-h-[44px] min-w-[44px]"
-                        onClick={() => setOrderQty((q) => Math.max(1, q - 1))}
-                      >
-                        <Minus className="h-5 w-5" />
-                      </Button>
-                      <span className="w-12 text-center text-lg font-semibold tabular-nums">
-                        {orderQty}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="min-h-[44px] min-w-[44px]"
-                        onClick={() => setOrderQty((q) => Math.min(99, q + 1))}
-                      >
-                        <Plus className="h-5 w-5" />
-                      </Button>
-                    </div>
-                    {orderAdded ? (
-                      <div className="flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-green-600 bg-green-50 px-6 py-3 text-sm font-medium text-green-700 transition-colors duration-200">
-                        <Check className="h-5 w-5 shrink-0" />
-                        تمت الإضافة
+                {product.catalogImage ? (
+                  <>
+                    <div className="space-y-3">
+                      <h2 className="text-xl font-semibold">كتالوج للطباعة</h2>
+                      <p className="text-sm text-muted-foreground">
+                        يمكنك تنزيل صورة عالية الدقة وطباعتها.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href={product.catalogImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-md border px-5 text-sm font-medium hover:bg-muted"
+                        >
+                          فتح صورة الكتالوج
+                        </a>
+                        <a
+                          href={product.catalogImage}
+                          download
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-md border px-5 text-sm font-medium hover:bg-muted"
+                        >
+                          تنزيل للطباعة
+                        </a>
                       </div>
-                    ) : (
-                      <Button
-                        onClick={() => {
-                          addToOrder(product, orderQty);
-                          setOrderAdded(true);
-                          setTimeout(() => setOrderAdded(false), 2200);
-                        }}
-                        variant="outline"
-                        className="min-h-[44px] border-brand-gold text-brand-gold hover:bg-brand-gold hover:text-white hover:shadow-md active:bg-brand-gold/90 px-6"
-                      >
-                        <ShoppingCart className="ml-2 h-5 w-5 shrink-0" />
-                        أضف للطلبية
-                      </Button>
-                    )}
+                    </div>
+                    <Separator />
+                  </>
+                ) : null}
+
+                {!isOnRecommendation ? (
+                  <div className="space-y-3">
+                    <p className="text-base font-medium text-muted-foreground">أضف للطلبية</p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-1 border rounded-md">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="min-h-[44px] min-w-[44px]"
+                          onClick={() => setOrderQty((q) => Math.max(1, q - 1))}
+                        >
+                          <Minus className="h-5 w-5" />
+                        </Button>
+                        <span className="w-12 text-center text-lg font-semibold tabular-nums">
+                          {orderQty}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="min-h-[44px] min-w-[44px]"
+                          onClick={() => setOrderQty((q) => Math.min(99, q + 1))}
+                        >
+                          <Plus className="h-5 w-5" />
+                        </Button>
+                      </div>
+                      {orderAdded ? (
+                        <div className="flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-green-600 bg-green-50 px-6 py-3 text-sm font-medium text-green-700 transition-colors duration-200">
+                          <Check className="h-5 w-5 shrink-0" />
+                          تمت الإضافة
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={() => {
+                            addToOrder(product, orderQty);
+                            setOrderAdded(true);
+                            setTimeout(() => setOrderAdded(false), 2200);
+                          }}
+                          variant="outline"
+                          className="min-h-[44px] border-brand-gold text-brand-gold hover:bg-brand-gold hover:text-white hover:shadow-md active:bg-brand-gold/90 px-6"
+                        >
+                          <ShoppingCart className="ml-2 h-5 w-5 shrink-0" />
+                          أضف للطلبية
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <p className="text-base font-medium">هذه الهدية على التوصية</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      العدد المتوفر حالياً 0 — تواصل معنا لطلبها بالتوصية.
+                    </p>
+                  </div>
+                )}
 
                 <Separator />
 

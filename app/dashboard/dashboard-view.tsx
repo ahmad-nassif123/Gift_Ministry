@@ -215,6 +215,7 @@ export function DashboardView() {
         contents: Array.isArray(product.contents) ? product.contents : [],
         giftTier: product.giftTier ?? "standard",
         images: Array.isArray(product.images) ? product.images : [],
+        catalogImage: typeof product.catalogImage === "string" ? product.catalogImage : undefined,
         availableQuantity: product.availableQuantity ?? 0,
         price: product.price,
       };

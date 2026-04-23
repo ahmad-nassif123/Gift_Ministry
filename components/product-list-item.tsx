@@ -20,6 +20,7 @@ export function ProductListItem({
 }) {
   const [quantity, setQuantity] = useState(1);
   const [showAdded, setShowAdded] = useState(false);
+  const isOnRecommendation = (product.availableQuantity ?? 0) === 0;
 
   const handleAdd = () => {
     if (!onAddToOrder || quantity < 1) return;
@@ -54,23 +55,31 @@ export function ProductListItem({
                   {product.name}
                 </h3>
               </Link>
-              <p className="mt-1 text-sm text-muted-foreground truncate">كود: {product.sku} · العدد: {product.availableQuantity ?? 0}</p>
+              <p className="mt-1 text-sm text-muted-foreground truncate">
+                كود: {product.sku} · العدد: {product.availableQuantity ?? 0}
+                {isOnRecommendation ? " · على التوصية" : ""}
+              </p>
             </div>
 
-            {product.giftTier ? (
-              <Badge
-                variant={product.giftTier === "luxury" ? "default" : "outline"}
-                className={
-                  product.giftTier === "luxury"
-                    ? "bg-brand-gold text-white border-brand-gold"
-                    : product.giftTier === "premium"
-                    ? "border-brand-green-dark text-brand-green-dark"
-                    : ""
-                }
-              >
-                {getGiftTierLabel(product.giftTier)}
-              </Badge>
-            ) : null}
+            <div className="flex flex-col items-end gap-1">
+              {isOnRecommendation ? (
+                <Badge variant="secondary">على التوصية</Badge>
+              ) : null}
+              {product.giftTier ? (
+                <Badge
+                  variant={product.giftTier === "luxury" ? "default" : "outline"}
+                  className={
+                    product.giftTier === "luxury"
+                      ? "bg-brand-gold text-white border-brand-gold"
+                      : product.giftTier === "premium"
+                      ? "border-brand-green-dark text-brand-green-dark"
+                      : ""
+                  }
+                >
+                  {getGiftTierLabel(product.giftTier)}
+                </Badge>
+              ) : null}
+            </div>
           </div>
 
           <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{product.shortDescription}</p>
@@ -88,7 +97,7 @@ export function ProductListItem({
               <span />
             )}
 
-            {onAddToOrder ? (
+            {onAddToOrder && !isOnRecommendation ? (
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1 rounded-md border">
                   <Button

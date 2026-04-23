@@ -31,12 +31,16 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
     contents: [],
     giftTier: "standard",
     images: [],
+    catalogImage: "",
     availableQuantity: 0,
   });
   const [contentInput, setContentInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [imageLinkOpen, setImageLinkOpen] = useState(false);
   const [imageLinkDraft, setImageLinkDraft] = useState("");
+  const [catalogUploading, setCatalogUploading] = useState(false);
+  const [catalogLinkOpen, setCatalogLinkOpen] = useState(false);
+  const [catalogLinkDraft, setCatalogLinkDraft] = useState("");
 
   const giftTiers = getAllGiftTiers();
 
@@ -75,6 +79,7 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
         contents: product.contents,
         giftTier: product.giftTier,
         images: product.images,
+        catalogImage: product.catalogImage ?? "",
         availableQuantity: product.availableQuantity || 0,
         price: product.price,
         archived: product.archived,
@@ -88,6 +93,7 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
         contents: [],
         giftTier: "standard",
         images: [],
+        catalogImage: "",
         availableQuantity: 0,
       });
       void loadNextSku();
@@ -184,6 +190,56 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
     const newImages = [...(formData.images || [])];
     newImages.splice(index, 1);
     setFormData({ ...formData, images: newImages });
+  };
+
+  const handleCatalogUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      notifyError("يرجى اختيار ملف صورة");
+      return;
+    }
+    setCatalogUploading(true);
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "include",
+        body: uploadFormData,
+      });
+      const result = await response.json();
+      if (result.success) {
+        setFormData({ ...formData, catalogImage: result.url });
+      } else {
+        notifyError(result.error || "فشل في رفع صورة الكتالوج");
+      }
+    } catch (error) {
+      console.error("Error uploading catalog image:", error);
+      notifyError("حدث خطأ أثناء رفع صورة الكتالوج");
+    } finally {
+      setCatalogUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const openCatalogLinkDialog = () => {
+    setCatalogLinkDraft(formData.catalogImage || "");
+    setCatalogLinkOpen(true);
+  };
+
+  const confirmCatalogLink = () => {
+    const t = catalogLinkDraft.trim();
+    if (!t) {
+      notifyError("يرجى إدخال رابط صورة الكتالوج.");
+      return;
+    }
+    setFormData({ ...formData, catalogImage: t });
+    setCatalogLinkOpen(false);
+  };
+
+  const clearCatalogImage = () => {
+    setFormData({ ...formData, catalogImage: "" });
   };
 
   return (
@@ -416,6 +472,83 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
             )}
           </div>
 
+          {/* كتالوج للطباعة */}
+          <div>
+            <label className="mb-2 block text-sm font-medium">
+              كتالوج الهدية للطباعة (صورة HD)
+            </label>
+            <div className="mb-2 flex flex-wrap gap-2">
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCatalogUpload}
+                  className="hidden"
+                  disabled={catalogUploading}
+                />
+                <div
+                  className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-base font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-brand-green-dark text-white hover:bg-brand-green-darker h-11 px-5 py-2.5 cursor-pointer ${
+                    catalogUploading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {catalogUploading ? "جاري الرفع..." : "رفع صورة الكتالوج"}
+                </div>
+              </label>
+              <Button
+                type="button"
+                onClick={openCatalogLinkDialog}
+                variant="outline"
+                disabled={catalogUploading}
+              >
+                إضافة/تعديل رابط الكتالوج
+              </Button>
+              {formData.catalogImage ? (
+                <Button type="button" onClick={clearCatalogImage} variant="outline">
+                  إزالة
+                </Button>
+              ) : null}
+            </div>
+
+            {formData.catalogImage ? (
+              <div className="mt-2 rounded-md border p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground break-all">
+                    {formData.catalogImage}
+                  </p>
+                  <div className="flex gap-2">
+                    <a
+                      href={formData.catalogImage}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
+                    >
+                      فتح
+                    </a>
+                    <a
+                      href={formData.catalogImage}
+                      download
+                      className="inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
+                    >
+                      تنزيل
+                    </a>
+                  </div>
+                </div>
+                <div className="mt-3 relative w-full max-w-[360px] aspect-[3/4] border rounded overflow-hidden bg-white dark:bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={formData.catalogImage}
+                    alt="معاينة كتالوج الطباعة"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                ارفع صورة كتالوج عالية الدقة (مثلاً A4) ليتم تنزيلها وطباعتها.
+              </p>
+            )}
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               إلغاء
@@ -452,6 +585,35 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
           </Button>
           <Button type="button" onClick={confirmImageLink}>
             إضافة
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={catalogLinkOpen} onOpenChange={setCatalogLinkOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>رابط صورة الكتالوج للطباعة</DialogTitle>
+        </DialogHeader>
+        <Input
+          value={catalogLinkDraft}
+          onChange={(e) => setCatalogLinkDraft(e.target.value)}
+          placeholder="https://..."
+          dir="ltr"
+          className="text-left font-mono text-sm"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              confirmCatalogLink();
+            }
+          }}
+        />
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setCatalogLinkOpen(false)}>
+            إلغاء
+          </Button>
+          <Button type="button" onClick={confirmCatalogLink}>
+            حفظ
           </Button>
         </DialogFooter>
       </DialogContent>

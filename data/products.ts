@@ -12,6 +12,8 @@ export interface Product {
   category?: string;
   giftTier: GiftTier; // تصنيف الهدية: قياسية، مميزة، فاخرة
   images: string[];
+  /** صورة كتالوج للطباعة (HD) — رابط مباشر للصورة */
+  catalogImage?: string;
   availableQuantity?: number; // الكمية المتوفرة
   archived?: boolean; // يُضبط عبر التحديث (PUT)؛ زر الحذف في الداشبورد يزيل الصف من القاعدة
   hidden?: boolean; // إخفاء عن الموقع الرسمي (يبقى في الداشبورد)

@@ -23,6 +23,7 @@ interface ProductCardProps {
 export function ProductCard({ product, index = 0, onAddToOrder, onQuickView }: ProductCardProps) {
   const [quantity, setQuantity] = useState(1);
   const [showAdded, setShowAdded] = useState(false);
+  const isOnRecommendation = (product.availableQuantity ?? 0) === 0;
 
   const handleAdd = () => {
     if (onAddToOrder && quantity >= 1) {
@@ -84,21 +85,28 @@ export function ProductCard({ product, index = 0, onAddToOrder, onQuickView }: P
                 {product.name}
               </h3>
             </Link>
-            {product.giftTier && (
-              <Badge 
-                variant={product.giftTier === "luxury" ? "default" : "outline"}
-                className={
-                  "shrink-0 text-[10px] px-1.5 py-0 leading-tight sm:text-xs sm:px-2.5 sm:py-0.5 " +
-                  (product.giftTier === "luxury" 
-                    ? "bg-brand-gold text-white border-brand-gold" 
-                    : product.giftTier === "premium"
-                    ? "border-brand-green-dark text-brand-green-dark"
-                    : "")
-                }
-              >
-                {getGiftTierLabel(product.giftTier)}
-              </Badge>
-            )}
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {isOnRecommendation ? (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 leading-tight sm:text-xs sm:px-2.5 sm:py-0.5">
+                  على التوصية
+                </Badge>
+              ) : null}
+              {product.giftTier ? (
+                <Badge
+                  variant={product.giftTier === "luxury" ? "default" : "outline"}
+                  className={
+                    "text-[10px] px-1.5 py-0 leading-tight sm:text-xs sm:px-2.5 sm:py-0.5 " +
+                    (product.giftTier === "luxury"
+                      ? "bg-brand-gold text-white border-brand-gold"
+                      : product.giftTier === "premium"
+                      ? "border-brand-green-dark text-brand-green-dark"
+                      : "")
+                  }
+                >
+                  {getGiftTierLabel(product.giftTier)}
+                </Badge>
+              ) : null}
+            </div>
           </div>
           <p className="mb-2 line-clamp-2 text-xs text-muted-foreground sm:mb-3 sm:text-base">
             {product.shortDescription}
@@ -122,7 +130,7 @@ export function ProductCard({ product, index = 0, onAddToOrder, onQuickView }: P
           )}
         </CardContent>
         <CardFooter className="flex flex-col gap-2 p-2 pt-0 sm:gap-3 sm:p-4">
-          {onAddToOrder && (
+          {onAddToOrder && !isOnRecommendation && (
             <div className="flex flex-col gap-1.5 w-full sm:gap-2">
               <div className="flex items-center justify-between gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground sm:text-sm">الكمية:</span>
@@ -173,7 +181,7 @@ export function ProductCard({ product, index = 0, onAddToOrder, onQuickView }: P
             rel="noopener noreferrer"
             className="inline-flex h-10 min-h-10 w-full items-center justify-center rounded-md bg-brand-green-dark px-2 py-2 text-center text-[11px] font-medium leading-tight text-white ring-offset-background transition-all duration-200 hover:bg-brand-green-darker hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] active:shadow-inner touch-manipulation sm:h-12 sm:min-h-[44px] sm:px-5 sm:text-base sm:leading-normal"
           >
-            استفسر عن الهدية
+            {isOnRecommendation ? "اطلبها بالتوصية" : "استفسر عن الهدية"}
           </a>
         </CardFooter>
       </Card>

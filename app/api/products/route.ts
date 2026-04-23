@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       contents: Array.isArray(body.contents) ? body.contents : [],
       giftTier: (body.giftTier as GiftTier) || "standard",
       images: Array.isArray(body.images) ? body.images : [],
+      catalogImage: typeof body.catalogImage === "string" ? body.catalogImage : undefined,
       availableQuantity: body.availableQuantity ?? 0,
       price: body.price,
     };
@@ -133,6 +134,7 @@ export async function PUT(request: NextRequest) {
       contents: body.contents,
       giftTier: body.giftTier,
       images: body.images,
+      catalogImage: body.catalogImage,
       availableQuantity: body.availableQuantity,
       price: body.price,
       archived: body.archived,

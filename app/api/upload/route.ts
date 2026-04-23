@@ -40,10 +40,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const maxSize = 10 * 1024 * 1024;
+    // صور الكتالوج للطباعة قد تكون كبيرة (HD)
+    const maxSize = 25 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json(
-        { success: false, error: "حجم الملف كبير جداً. الحد الأقصى 10MB" },
+        { success: false, error: "حجم الملف كبير جداً. الحد الأقصى 25MB" },
         { status: 400 }
       );
     }
