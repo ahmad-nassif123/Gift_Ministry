@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { catalogStagger, catalogTransition } from "@/lib/catalog-motion";
-import { ShoppingCart, Plus, Minus, Check } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Check, Sparkles } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ export function ProductCard({ product, index = 0, onAddToOrder, onQuickView }: P
       }}
       className="h-full"
     >
-      <Card className="group h-full overflow-hidden rounded-lg shadow-sm transition-all duration-200 sm:rounded-xl sm:shadow-md sm:hover:shadow-lg sm:hover:shadow-primary/10 sm:hover:-translate-y-2">
+      <Card className="group flex h-full flex-col overflow-hidden rounded-lg shadow-sm transition-all duration-200 sm:rounded-xl sm:shadow-md sm:hover:shadow-lg sm:hover:shadow-primary/10 sm:hover:-translate-y-2">
         <Link href={`/products/${product.slug}`}>
           <CardHeader className="p-0">
             {/* جوال: صورة أقل ارتفاعاً؛ سطح المكتب: مربع */}
@@ -78,7 +78,7 @@ export function ProductCard({ product, index = 0, onAddToOrder, onQuickView }: P
             </div>
           </CardHeader>
         </Link>
-        <CardContent className="p-2 sm:p-4">
+        <CardContent className="flex-1 p-2 sm:p-4">
           <div className="mb-1.5 flex items-start justify-between gap-1.5 sm:mb-2 sm:gap-2">
             <Link href={`/products/${product.slug}`} className="min-w-0 flex-1">
               <h3 className="text-sm font-semibold leading-snug transition-colors duration-200 hover:text-brand-green-dark sm:text-xl sm:leading-tight">
@@ -129,7 +129,7 @@ export function ProductCard({ product, index = 0, onAddToOrder, onQuickView }: P
             </button>
           )}
         </CardContent>
-        <CardFooter className="flex flex-col gap-2 p-2 pt-0 sm:gap-3 sm:p-4">
+        <CardFooter className="mt-auto flex flex-col gap-2 p-2 pt-0 sm:gap-3 sm:p-4">
           {onAddToOrder && !isOnRecommendation && (
             <div className="flex flex-col gap-1.5 w-full sm:gap-2">
               <div className="flex items-center justify-between gap-1.5">
@@ -175,6 +175,21 @@ export function ProductCard({ product, index = 0, onAddToOrder, onQuickView }: P
               )}
             </div>
           )}
+          {isOnRecommendation ? (
+            <div className="w-full rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-gold/15 text-brand-gold">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold leading-snug">متوفرة بالتوصية</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    العدد حالياً 0 — تواصل معنا لتجهيزها حسب الطلب.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <a
             href={generateWhatsAppLink(product.name, product.sku)}
             target="_blank"

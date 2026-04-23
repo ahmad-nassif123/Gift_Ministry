@@ -203,7 +203,15 @@ function HomeContent() {
   }, [filteredProducts]);
 
   const renderProductGrid = (list: Product[], keyPrefix: string) => (
-    <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 lg:gap-6">
+    <div
+      className={[
+        // موبايل: عمودين ثابتين لبطاقات أصغر
+        "grid grid-cols-2 gap-2",
+        // من sm+: شبكة مرنة تمنع ظهور صف أخير "منعزل" (بطاقتين لوحدهم)
+        "sm:gap-4 sm:[grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]",
+        "lg:gap-6",
+      ].join(" ")}
+    >
       {list.map((product, index) => (
         <ProductCard
           key={`${keyPrefix}-${product.slug}`}
