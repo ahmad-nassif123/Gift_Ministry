@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { X, ShoppingCart } from "lucide-react";
+import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "@/lib/browser-storage";
 
 const STORAGE_KEY = "welcome_tip_seen";
 
@@ -14,13 +15,13 @@ export function WelcomeTip() {
 
   useEffect(() => {
     if (typeof window === "undefined" || !isCatalogPage) return;
-    const seen = localStorage.getItem(STORAGE_KEY);
+    const seen = safeLocalStorageGetItem(STORAGE_KEY);
     if (!seen) setShow(true);
   }, [isCatalogPage]);
 
   const handleDismiss = () => {
     setShow(false);
-    if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, "1");
+    safeLocalStorageSetItem(STORAGE_KEY, "1");
   };
 
   if (!show || !isCatalogPage) return null;

@@ -28,6 +28,7 @@ import {
   loadPublicProductsFromLocalStorage,
   PRODUCTS_STORAGE_KEY,
 } from "@/lib/products-local-storage";
+import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "@/lib/browser-storage";
 
 function applyArabicSearchCorrections(input: string): string {
   const s = (input ?? "").trim();
@@ -96,8 +97,8 @@ function HomeContent() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const n = parseInt(localStorage.getItem("visit_count") ?? "0", 10);
-        localStorage.setItem("visit_count", String(n + 1));
+        const n = parseInt(safeLocalStorageGetItem("visit_count") ?? "0", 10);
+        safeLocalStorageSetItem("visit_count", String(n + 1));
       } catch {}
     }
   }, []);
@@ -111,9 +112,7 @@ function HomeContent() {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
           setAllProducts(json.data);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(json.data));
-          }
+          safeLocalStorageSetItem(PRODUCTS_STORAGE_KEY, JSON.stringify(json.data));
           return;
         }
       } catch {

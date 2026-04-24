@@ -15,6 +15,7 @@ import { productPageUrl } from "@/lib/site-url";
 import { siteConfig } from "@/lib/config";
 import { useConfirm } from "@/components/confirm-dialog-provider";
 import { notifyError, notifyInfo, notifySuccess } from "@/lib/notify";
+import { safeLocalStorageRemoveItem } from "@/lib/browser-storage";
 
 export function DashboardViewBody(props: DashboardViewReturnProps) {
   const confirm = useConfirm();
@@ -99,7 +100,7 @@ export function DashboardViewBody(props: DashboardViewReturnProps) {
     });
     if (!ok) return;
     try {
-      localStorage.removeItem("products");
+      safeLocalStorageRemoveItem("products");
     } catch {
       //
     }

@@ -20,6 +20,10 @@ import { DashboardViewReturn } from "./dashboard-view-return";
 import type { InputChangeEvent } from "./dashboard-types";
 import { useConfirm } from "@/components/confirm-dialog-provider";
 import { notifyError, notifySuccess, notifyInfo } from "@/lib/notify";
+import {
+  safeLocalStorageGetItem,
+  safeLocalStorageSetItem,
+} from "@/lib/browser-storage";
 
 export function DashboardView() {
   const router = useRouter();
@@ -62,7 +66,7 @@ export function DashboardView() {
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
         setProducts(json.data);
-        if (typeof window !== "undefined") localStorage.setItem("products", JSON.stringify(json.data));
+        safeLocalStorageSetItem("products", JSON.stringify(json.data));
         notifyProductsStorageChanged();
       }
     } catch {
@@ -73,11 +77,9 @@ export function DashboardView() {
   useEffect(() => {
     setMounted(true);
     refetchProducts(false);
-    if (typeof window !== "undefined") {
-      const n = parseInt(localStorage.getItem("visit_count") ?? "0", 10);
-      setVisitCount(n);
-      setOrders(getStoredOrders());
-    }
+    const n = parseInt(safeLocalStorageGetItem("visit_count") ?? "0", 10);
+    setVisitCount(Number.isFinite(n) ? n : 0);
+    setOrders(getStoredOrders());
   }, [refetchProducts]);
 
   const PRODUCTS_AUTO_REFRESH_MS = 45 * 1000;
@@ -171,7 +173,7 @@ export function DashboardView() {
 
   useEffect(() => {
     if (mounted && typeof window !== "undefined") {
-      localStorage.setItem("products", JSON.stringify(products));
+      safeLocalStorageSetItem("products", JSON.stringify(products));
     }
   }, [products, mounted]);
 
@@ -241,10 +243,8 @@ export function DashboardView() {
               ? prev.map((p) => (p.slug === slug ? saved : p))
               : [...prev, saved];
             try {
-              if (typeof window !== "undefined") {
-                localStorage.setItem("products", JSON.stringify(next));
-                notifyProductsStorageChanged();
-              }
+              safeLocalStorageSetItem("products", JSON.stringify(next));
+              notifyProductsStorageChanged();
             } catch {
               //
             }
@@ -437,7 +437,7 @@ export function DashboardView() {
           });
           if (typeof window !== "undefined") {
             try {
-              localStorage.setItem("products", JSON.stringify(next));
+              safeLocalStorageSetItem("products", JSON.stringify(next));
               notifyProductsStorageChanged();
             } catch {
               //
@@ -548,10 +548,8 @@ export function DashboardView() {
           });
           if (!restoreOk) return;
           setProducts(data as Product[]);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("products", JSON.stringify(data));
-            notifyProductsStorageChanged();
-          }
+          safeLocalStorageSetItem("products", JSON.stringify(data));
+          notifyProductsStorageChanged();
           notifySuccess("تمت الاستعادة بنجاح.");
         } catch {
           notifyError("تعذر قراءة الملف. تأكد أنه ملف JSON صالح.");

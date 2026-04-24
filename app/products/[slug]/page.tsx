@@ -24,6 +24,7 @@ import { ImageLightbox } from "@/components/image-lightbox";
 import { ProductQRModal } from "@/components/product-qr-modal";
 import { BLUR_DATA_URL } from "@/lib/blur-placeholder";
 import { notifyError } from "@/lib/notify";
+import { safeLocalStorageSetItem } from "@/lib/browser-storage";
 
 interface ProductPageProps {
   params: {
@@ -93,9 +94,7 @@ export default function ProductPage({ params }: ProductPageProps) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
           const data = json.data as Product[];
-          if (typeof window !== "undefined") {
-            localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(data));
-          }
+          safeLocalStorageSetItem(PRODUCTS_STORAGE_KEY, JSON.stringify(data));
           applyList(data);
           return;
         }
