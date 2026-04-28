@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Edit, Trash2, Search, LogOut, Download, Upload, BarChart3, ClipboardList, FileText, QrCode, DownloadCloud, RefreshCw, AlertTriangle, RotateCcw, Printer, Eye, EyeOff, Sheet } from "lucide-react";
+import { Plus, Edit, Trash2, Search, LogOut, Download, Upload, BarChart3, ClipboardList, FileText, QrCode, DownloadCloud, RefreshCw, AlertTriangle, RotateCcw, Printer, Eye, EyeOff, Sheet, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -418,6 +418,11 @@ export function DashboardViewBody(props: DashboardViewReturnProps) {
                 <div><span className="text-muted-foreground">عدد زيارات الصفحة الرئيسية:</span> <span className="mr-2 font-bold text-lg">{visitCount}</span> <span className="text-muted-foreground text-xs">(هذا المتصفح)</span></div>
               </div>
               <div className="flex flex-wrap gap-3">
+                <Link href="/dashboard/art-inventory" className="min-w-0">
+                  <Button variant="outline" size="sm" className="min-h-[44px] touch-manipulation w-full sm:w-auto">
+                    <Warehouse className="ml-2 h-4 w-4" /> جرد الإنتاج الفني
+                  </Button>
+                </Link>
                 <Button
                   variant="outline"
                   size="sm"
