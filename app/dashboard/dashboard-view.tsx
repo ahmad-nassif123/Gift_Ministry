@@ -34,7 +34,7 @@ export function DashboardView() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [mounted, setMounted] = useState(false);
   const [visitCount, setVisitCount] = useState<number>(0);
-  const [dashboardTab, setDashboardTab] = useState<"products" | "orders">("products");
+  const [dashboardTab, setDashboardTab] = useState<"products" | "orders" | "admin">("products");
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [reportMonth, setReportMonth] = useState<string>(() => {
     const d = new Date();

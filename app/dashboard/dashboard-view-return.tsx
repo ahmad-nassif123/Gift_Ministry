@@ -11,8 +11,8 @@ export type DashboardViewReturnProps = {
   products: Product[];
   searchQuery: string;
   setSearchQuery: (v: string) => void;
-  dashboardTab: "products" | "orders";
-  setDashboardTab: (v: "products" | "orders") => void;
+  dashboardTab: "products" | "orders" | "admin";
+  setDashboardTab: (v: "products" | "orders" | "admin") => void;
   orders: OrderRecord[];
   reportMonth: string;
   setReportMonth: (v: string) => void;
