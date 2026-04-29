@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, FileSpreadsheet, PackagePlus, RefreshCw, Send, Warehouse } from "lucide-react";
+import { ArrowRight, FileSpreadsheet, PackagePlus, RefreshCw, Search, Send, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ export default function ArtInventoryPage() {
   const [adding, setAdding] = useState(false);
 
   const [issueItemId, setIssueItemId] = useState<string>("");
+  const [issueSearch, setIssueSearch] = useState("");
   const [issueQty, setIssueQty] = useState("1");
   const [issueEntity, setIssueEntity] = useState("");
   const [issueNotes, setIssueNotes] = useState("");
@@ -100,6 +101,16 @@ export default function ArtInventoryPage() {
     return m;
   }, [items]);
 
+  const issueFilteredItems = useMemo(() => {
+    const q = issueSearch.trim().toLowerCase();
+    const base = q
+      ? items.filter((it) => `${it.name} ${it.description ?? ""}`.toLowerCase().includes(q))
+      : items;
+    return base.slice(0, 12);
+  }, [items, issueSearch]);
+
+  const selectedIssueItem = issueItemId ? itemsById.get(Number(issueItemId)) : undefined;
+
   const totals = useMemo(() => {
     const count = items.length;
     const qty = items.reduce((s, it) => s + (it.currentQty ?? 0), 0);
@@ -134,6 +145,7 @@ export default function ArtInventoryPage() {
         setNewDesc("");
         setNewQty("0");
         setIssueItemId(String(json.item.id));
+        setIssueSearch(json.item.name);
         await fetchAll();
       } else {
         toast.error(json.error || "تعذر إضافة الصنف.");
@@ -181,6 +193,8 @@ export default function ArtInventoryPage() {
         setIssueQty("1");
         setIssueEntity("");
         setIssueNotes("");
+        setIssueSearch("");
+        setIssueItemId("");
         await fetchAll();
       } else {
         toast.error(json.error || "تعذر التخريج.");
@@ -324,6 +338,47 @@ export default function ArtInventoryPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={issueSearch}
+                    onChange={(e) => setIssueSearch(e.target.value)}
+                    placeholder="ابحث عن الصنف بالاسم أو الوصف..."
+                    className="min-h-[44px] pr-10"
+                  />
+                </div>
+                {issueFilteredItems.length > 0 && (
+                  <div className="max-h-48 overflow-y-auto rounded-md border">
+                    <div className="divide-y">
+                      {issueFilteredItems.map((it) => {
+                        const selected = String(it.id) === issueItemId;
+                        return (
+                          <button
+                            key={it.id}
+                            type="button"
+                            onClick={() => {
+                              setIssueItemId(String(it.id));
+                              setIssueSearch(it.name);
+                            }}
+                            className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-right transition-colors hover:bg-muted ${
+                              selected ? "bg-primary/10" : ""
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate font-medium">{it.name}</div>
+                              <div className="truncate text-xs text-muted-foreground">
+                                {it.description || "بدون وصف"}
+                              </div>
+                            </div>
+                            <div className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                              المتوفر: {it.currentQty ?? 0}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <select
                   value={issueItemId}
                   onChange={(e) => setIssueItemId(e.target.value)}
@@ -336,6 +391,16 @@ export default function ArtInventoryPage() {
                     </option>
                   ))}
                 </select>
+                {selectedIssueItem && (
+                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                    <span className="font-medium">{selectedIssueItem.name}</span>
+                    <span className="text-muted-foreground"> — المتوفر حاليًا: </span>
+                    <span className="tabular-nums">{selectedIssueItem.currentQty ?? 0}</span>
+                    {selectedIssueItem.description ? (
+                      <div className="mt-1 text-xs text-muted-foreground">{selectedIssueItem.description}</div>
+                    ) : null}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <Input
                     value={issueQty}
