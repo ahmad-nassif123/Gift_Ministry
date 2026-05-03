@@ -1,26 +1,23 @@
 import { pdf } from "@react-pdf/renderer";
-import { AdminQuotePDF, type AdminQuoteLine } from "@/components/pdf/admin-quote-pdf";
+import { AdminQuotePDF, type AdminQuoteLine, type AdminQuotePdfMeta } from "@/components/pdf/admin-quote-pdf";
+
+export type { AdminQuoteLine, AdminQuotePdfMeta };
 
 export async function generateAdminQuoteBlob(input: {
-  title?: string;
-  subtitle?: string;
+  meta: AdminQuotePdfMeta;
   lines: AdminQuoteLine[];
   grandTotalText: string;
+  grandNumericForWords: number;
+  currency: "SYP" | "USD";
 }): Promise<Blob> {
-  const dateStr = new Date().toLocaleDateString("ar-SA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
   const doc = (
     <AdminQuotePDF
-      title={input.title}
-      subtitle={input.subtitle}
-      dateStr={dateStr}
+      meta={input.meta}
       lines={input.lines}
       grandTotalText={input.grandTotalText}
+      grandNumericForWords={input.grandNumericForWords}
+      currency={input.currency}
     />
   );
   return pdf(doc).toBlob();
 }
-

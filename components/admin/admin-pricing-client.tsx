@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Product } from "@/data/products";
+import { cn } from "@/lib/utils";
 
 type QuoteLine = { slug: string; qty: number };
 
@@ -28,6 +29,22 @@ function formatMoney(n: number): string {
   return v.toLocaleString("ar-SA");
 }
 
+function round2(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 100) / 100;
+}
+
+function formatInvoiceDateAr(isoYmd: string): string {
+  const p = isoYmd.trim().split("-").map((x) => Number(x));
+  const y = p[0];
+  const m = p[1];
+  const d = p[2];
+  if (!y || !m || !d) return isoYmd;
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return isoYmd;
+  return dt.toLocaleDateString("ar-SY", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+}
+
 export function AdminPricingClient() {
   const [gateOk, setGateOk] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
@@ -41,6 +58,19 @@ export function AdminPricingClient() {
   const [quotePdfLoading, setQuotePdfLoading] = useState(false);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [savingSlug, setSavingSlug] = useState<string | null>(null);
+
+  const [invoiceNo, setInvoiceNo] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `INV-${y}${m}${day}`;
+  });
+  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [toSir, setToSir] = useState("");
+  const [statement, setStatement] = useState("");
+  const [pdfCurrency, setPdfCurrency] = useState<"SYP" | "USD">("SYP");
+  const [usdRate, setUsdRate] = useState("15000");
 
   const checkGate = useCallback(async () => {
     try {
@@ -154,24 +184,92 @@ export function AdminPricingClient() {
       toast.message("أضف هدية واحدة على الأقل للحساب.");
       return;
     }
+    const rate = Number(String(usdRate).replace(/[^\d.]/g, ""));
+    if (pdfCurrency === "USD" && (!Number.isFinite(rate) || rate <= 0)) {
+      toast.error("أدخل سعر صرف صالح (ليرة سورية للدولار الواحد) لتصدير الملف بالدولار.");
+      return;
+    }
     setQuotePdfLoading(true);
     try {
       const { generateAdminQuoteBlob } = await import("@/lib/admin-quote-pdf");
+      type PdfLine = {
+        sku: string;
+        name: string;
+        quantity: number;
+        unit: string;
+        unitPriceText: string;
+        lineValueText: string;
+        runningTotalText: string;
+      };
+      const pdfLines: PdfLine[] = [];
+      let running = 0;
+      let grandNumericForWords = 0;
+
+      for (const l of quoteComputed.lines) {
+        const qty = Math.max(0, Math.floor(l.qty));
+        const unitSyp = l.unitNum;
+        const unitLabel = "قطعة";
+
+        if (pdfCurrency === "SYP") {
+          const unitP = Math.floor(unitSyp);
+          const lineVal = unitP * qty;
+          running += lineVal;
+          grandNumericForWords = running;
+          pdfLines.push({
+            sku: l.sku || "—",
+            name: l.name,
+            quantity: qty,
+            unit: unitLabel,
+            unitPriceText: unitP > 0 ? `${unitP.toLocaleString("ar-SA")} ل.س` : "—",
+            lineValueText: unitP > 0 ? `${lineVal.toLocaleString("ar-SA")} ل.س` : "—",
+            runningTotalText: `${running.toLocaleString("ar-SA")} ل.س`,
+          });
+        } else {
+          const unitUsd = unitSyp > 0 ? round2(unitSyp / rate) : 0;
+          const lineVal = unitSyp > 0 ? round2((unitSyp * qty) / rate) : 0;
+          running = round2(running + lineVal);
+          grandNumericForWords = running;
+          pdfLines.push({
+            sku: l.sku || "—",
+            name: l.name,
+            quantity: qty,
+            unit: unitLabel,
+            unitPriceText: unitSyp > 0 ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—",
+            lineValueText: unitSyp > 0 ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—",
+            runningTotalText: `${running.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`,
+          });
+        }
+      }
+
+      const grandTotalText =
+        pdfCurrency === "SYP"
+          ? `${Math.floor(running).toLocaleString("ar-SA")} ل.س`
+          : `${running.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+
+      const currencyNote =
+        pdfCurrency === "SYP"
+          ? "الليرة السورية — العملة الجديدة"
+          : `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA")} ل.س للدولار الواحد)`;
+
       const blob = await generateAdminQuoteBlob({
-        title: "الإدارة — تسعير الهدايا",
-        subtitle: "السعر الفردي + الكمية + الإجمالي",
-        lines: quoteComputed.lines.map((l) => ({
-          name: l.name,
-          unitPriceText: l.unitPriceText,
-          quantity: l.qty,
-          lineTotalText: l.unitNum > 0 ? formatMoney(l.totalNum) : "—",
-        })),
-        grandTotalText: formatMoney(quoteComputed.grand),
+        meta: {
+          supplier: "قسم الانتاج الفني",
+          toSir: toSir.trim(),
+          statement: statement.trim(),
+          invoiceNo: invoiceNo.trim(),
+          documentDateStr: formatInvoiceDateAr(invoiceDate),
+          currencyNote,
+        },
+        lines: pdfLines,
+        grandTotalText,
+        grandNumericForWords: pdfCurrency === "SYP" ? Math.floor(running) : running,
+        currency: pdfCurrency,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `تسعير-الهدايا-${new Date().toISOString().slice(0, 10)}.pdf`;
+      const safeInv = invoiceNo.trim().replace(/[^\w\u0600-\u06FF-]+/g, "_").slice(0, 40);
+      a.download = `فاتورة-${safeInv || "عرض-أسعار"}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -218,6 +316,13 @@ export function AdminPricingClient() {
     setQuoteLines([]);
     setPriceDrafts({});
     setSavingSlug(null);
+    setToSir("");
+    setStatement("");
+    setPdfCurrency("SYP");
+    setUsdRate("15000");
+    setInvoiceDate(new Date().toISOString().slice(0, 10));
+    const d = new Date();
+    setInvoiceNo(`INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`);
     setGateOk(false);
     toast.message("تم الخروج.");
   };
@@ -333,6 +438,85 @@ export function AdminPricingClient() {
               <p className="text-sm text-muted-foreground">
                 ابحث عن هدية وأضفها للحساب، ثم حدّد الكمية لتحصل على الإجمالي ويمكنك تحميل PDF.
               </p>
+
+              <div className="rounded-lg border bg-card p-4 space-y-4">
+                <p className="text-sm font-semibold">بيانات الفاتورة (PDF)</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="inv-no" className="mb-1 block text-sm text-muted-foreground">
+                      رقم الفاتورة
+                    </label>
+                    <Input id="inv-no" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} className="min-h-[44px]" />
+                  </div>
+                  <div>
+                    <label htmlFor="inv-date" className="mb-1 block text-sm text-muted-foreground">
+                      التاريخ
+                    </label>
+                    <Input id="inv-date" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="min-h-[44px]" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="inv-to" className="mb-1 block text-sm text-muted-foreground">
+                      إلى السيد
+                    </label>
+                    <Input id="inv-to" value={toSir} onChange={(e) => setToSir(e.target.value)} placeholder="اسم الجهة أو الشخص" className="min-h-[44px]" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="inv-st" className="mb-1 block text-sm text-muted-foreground">
+                      البيان
+                    </label>
+                    <textarea
+                      id="inv-st"
+                      value={statement}
+                      onChange={(e) => setStatement(e.target.value)}
+                      placeholder="وصف مختصر للمعاملة أو الغرض من عرض السعر..."
+                      rows={3}
+                      className={cn(
+                        "flex w-full rounded-md border border-input bg-background px-4 py-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[88px]"
+                      )}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">عملة المستند</p>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="pdf-currency"
+                        className="h-4 w-4"
+                        checked={pdfCurrency === "SYP"}
+                        onChange={() => setPdfCurrency("SYP")}
+                      />
+                      الليرة السورية (الجديدة)
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="pdf-currency"
+                        className="h-4 w-4"
+                        checked={pdfCurrency === "USD"}
+                        onChange={() => setPdfCurrency("USD")}
+                      />
+                      الدولار الأمريكي
+                    </label>
+                  </div>
+                  {pdfCurrency === "USD" && (
+                    <div>
+                      <label htmlFor="usd-rate" className="mb-1 block text-sm text-muted-foreground">
+                        سعر الصرف (ليرة سورية للدولار الواحد)
+                      </label>
+                      <Input
+                        id="usd-rate"
+                        inputMode="decimal"
+                        value={usdRate}
+                        onChange={(e) => setUsdRate(e.target.value)}
+                        placeholder="مثال: 15000"
+                        className="min-h-[44px] max-w-xs"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="relative">
                 <Search className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
