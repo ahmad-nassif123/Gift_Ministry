@@ -119,7 +119,7 @@ public/images/
     "عنصر 1",
     "عنصر 2",
   ],
-  price: "1,500 ر.س",                // السعر (اختياري)
+  price: "1,500 ل.س",                // السعر (اختياري)
   images: [                           // مسارات الصور
     "/images/product-1.jpg",
     "/images/product-2.jpg",
@@ -140,7 +140,7 @@ public/images/
     "صندوق أنيق",
     "بطاقة ضمان",
   ],
-  price: "3,500 ر.س",
+  price: "3,500 ل.س",
   images: [
     "/images/watch-1.jpg",
     "/images/watch-2.jpg",
