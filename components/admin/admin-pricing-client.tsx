@@ -253,7 +253,6 @@ export function AdminPricingClient() {
 
       const blob = await generateAdminQuoteBlob({
         meta: {
-          supplier: "قسم الانتاج الفني",
           toSir: toSir.trim(),
           statement: statement.trim(),
           invoiceNo: invoiceNo.trim(),

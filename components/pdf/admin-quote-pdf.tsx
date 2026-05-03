@@ -30,12 +30,16 @@ const styles = StyleSheet.create({
     direction: "rtl",
     backgroundColor: COLORS.white,
   },
-  docTitle: {
-    fontSize: 14,
+  /** ترويسة المستند */
+  letterhead: {
+    fontSize: 18,
     fontWeight: 900,
     color: COLORS.primary,
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 4,
+    paddingBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary,
   },
   metaBlock: {
     borderWidth: 1,
@@ -172,7 +176,6 @@ export type AdminQuoteLine = {
 };
 
 export type AdminQuotePdfMeta = {
-  supplier: string;
   toSir: string;
   statement: string;
   invoiceNo: string;
@@ -199,13 +202,9 @@ export function AdminQuotePDF({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Text style={styles.docTitle}>عرض أسعار / فاتورة</Text>
+        <Text style={styles.letterhead}>قسم الانتاج الفني</Text>
 
         <View style={styles.metaBlock}>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>المورد:</Text>
-            <Text style={styles.metaValue}>{meta.supplier}</Text>
-          </View>
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>إلى السيد:</Text>
             <Text style={styles.metaValue}>{meta.toSir || "—"}</Text>
