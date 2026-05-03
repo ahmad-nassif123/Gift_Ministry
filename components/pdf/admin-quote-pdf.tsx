@@ -27,6 +27,9 @@ const COLORS = {
   gray700: "#374151",
 };
 
+/** U+061C: يربط «:» بالنص العربي في PDF فيظهر بعد الكلمة وليس قبلها. */
+const AR_COLON = "\u061c:";
+
 /** أرقام عربية شرقية (٠١٢…) — متسقة مع بقية نص PDF وبدون كتلة LTR منفصلة. */
 function formatArabicIndicInt(n: number, grouping = true): string {
   const v = Math.max(0, Math.floor(Number.isFinite(n) ? n : 0));
@@ -100,21 +103,14 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     marginBottom: 4,
   },
-  /** عمود التسمية: صف عربي + «:» بدون محارف اتجاه خفية (تسبب مربعات في بعض عارضات PDF). */
-  metaLabelWrap: {
-    fontFamily: "Tajawal",
-    width: "22%",
-    flexDirection: "row",
-    direction: "rtl",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 3,
-  },
+  /** تسمية الحقل + «:» في نص واحد؛ U+061C قبل النقطتين تربطهما بالعربية في PDF. */
   metaLabel: {
     fontFamily: "Tajawal",
+    width: "22%",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.primary,
+    textAlign: "right",
   },
   metaValue: {
     fontFamily: "Tajawal",
@@ -172,20 +168,13 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: COLORS.gray50,
   },
-  wordsLabelRow: {
-    fontFamily: "Tajawal",
-    flexDirection: "row",
-    direction: "rtl",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 3,
-    marginBottom: 4,
-  },
   wordsLabel: {
     fontFamily: "Tajawal",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.primary,
+    textAlign: "right",
+    marginBottom: 4,
   },
   wordsText: {
     fontFamily: "Tajawal",
@@ -197,8 +186,7 @@ const styles = StyleSheet.create({
   totalsRow: {
     fontFamily: "Tajawal",
     marginTop: 8,
-    flexDirection: "row",
-    direction: "rtl",
+    flexDirection: "row-reverse",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 6,
@@ -228,12 +216,6 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     color: COLORS.gray700,
     textAlign: "right",
-  },
-  figuresLabel: {
-    fontFamily: "Tajawal",
-    fontSize: 9,
-    fontWeight: 700,
-    color: COLORS.gray700,
   },
   /** المستلم يميناً، المسلّم يساراً (صف RTL). */
   signatureRow: {
@@ -332,38 +314,23 @@ export function AdminQuotePDF({
 
         <View style={styles.metaBlock}>
           <View style={styles.metaRow}>
-            <View style={styles.metaLabelWrap}>
-              <Text style={styles.metaLabel}>إلى السيد</Text>
-              <Text style={styles.metaLabel}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>{`إلى السيد${AR_COLON}`}</Text>
             <Text style={styles.metaValue}>{meta.toSir || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <View style={styles.metaLabelWrap}>
-              <Text style={styles.metaLabel}>البيان</Text>
-              <Text style={styles.metaLabel}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>{`البيان${AR_COLON}`}</Text>
             <Text style={styles.metaValue}>{meta.statement || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <View style={styles.metaLabelWrap}>
-              <Text style={styles.metaLabel}>رقم الفاتورة</Text>
-              <Text style={styles.metaLabel}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>{`رقم الفاتورة${AR_COLON}`}</Text>
             <Text style={styles.metaValue}>{meta.invoiceNo || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <View style={styles.metaLabelWrap}>
-              <Text style={styles.metaLabel}>التاريخ</Text>
-              <Text style={styles.metaLabel}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>{`التاريخ${AR_COLON}`}</Text>
             <Text style={styles.metaValue}>{meta.documentDateStr}</Text>
           </View>
           <View style={[styles.metaRow, { marginBottom: 0 }]}>
-            <View style={styles.metaLabelWrap}>
-              <Text style={styles.metaLabel}>العملة</Text>
-              <Text style={styles.metaLabel}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>{`العملة${AR_COLON}`}</Text>
             <Text style={styles.metaValue}>{meta.currencyNote}</Text>
           </View>
         </View>
@@ -395,15 +362,10 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.wordsBox}>
-          <View style={styles.wordsLabelRow}>
-            <Text style={styles.wordsLabel}>المبلغ كتابةً</Text>
-            <Text style={styles.wordsLabel}>:</Text>
-          </View>
+          <Text style={styles.wordsLabel}>{`المبلغ كتابةً${AR_COLON}`}</Text>
           <Text style={styles.wordsText}>{words}</Text>
           <Text style={styles.figuresLineText}>
-            <Text style={styles.figuresLabel}>رقماً</Text>
-            <Text style={styles.figuresLabel}>: </Text>
-            <Text style={styles.figuresLabel}>{currency === "SYP" ? figuresAmountSyp : figuresAmountUsd}</Text>
+            {`رقماً${AR_COLON} ${currency === "SYP" ? figuresAmountSyp : figuresAmountUsd}`}
           </Text>
         </View>
 
