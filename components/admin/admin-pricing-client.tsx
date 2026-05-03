@@ -29,6 +29,11 @@ function formatMoney(n: number): string {
   return v.toLocaleString("ar-SA");
 }
 
+/** عرض «ل.س» في واجهة الإدارة حتى لو كان السعر المخزّن يحتوي «ر.س». */
+function normalizeSypCurrencyLabel(raw: string): string {
+  return String(raw).replace(/ر\.س/g, "ل.س");
+}
+
 function round2(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.round(n * 100) / 100;
@@ -115,7 +120,7 @@ export function AdminPricingClient() {
       const next: Record<string, string> = { ...prev };
       for (const p of products) {
         if (next[p.slug] === undefined) {
-          next[p.slug] = String(p.price ?? "");
+          next[p.slug] = normalizeSypCurrencyLabel(String(p.price ?? ""));
         }
       }
       return next;
@@ -159,7 +164,7 @@ export function AdminPricingClient() {
           slug: l.slug,
           sku: p.sku,
           name: p.name,
-          unitPriceText: (p.price ?? "").trim() || "—",
+          unitPriceText: normalizeSypCurrencyLabel((p.price ?? "").trim()) || "—",
           unitNum,
           qty,
           totalNum,
@@ -337,7 +342,7 @@ export function AdminPricingClient() {
         return;
       }
       setProducts((prev) => prev.map((p) => (p.slug === slug ? json.data! : p)));
-      setPriceDrafts((prev) => ({ ...prev, [slug]: String(json.data!.price ?? "") }));
+      setPriceDrafts((prev) => ({ ...prev, [slug]: normalizeSypCurrencyLabel(String(json.data!.price ?? "")) }));
       toast.success("تم حفظ السعر.");
     } catch {
       toast.error("حدث خطأ أثناء حفظ السعر.");
@@ -540,7 +545,7 @@ export function AdminPricingClient() {
                                 <div className="font-medium truncate">{p.name}</div>
                                 <div className="mt-1 flex flex-wrap gap-2">
                                   <Badge variant="outline">كود: {p.sku}</Badge>
-                                  <Badge variant="outline">السعر: {p.price ?? "—"}</Badge>
+                                  <Badge variant="outline">السعر: {normalizeSypCurrencyLabel(String(p.price ?? "")) || "—"}</Badge>
                                 </div>
                               </div>
                               <Button type="button" onClick={() => addQuoteLine(p.slug)} disabled={already} className="min-h-[44px] shrink-0">
