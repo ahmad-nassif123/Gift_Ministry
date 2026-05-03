@@ -41,7 +41,7 @@ export function Navbar() {
             الهدايا
           </Link>
           <Link
-            href="/dashboard?tab=admin"
+            href="/admin/pricing"
             className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-brand-green-dark"
           >
             <Calculator className="h-4 w-4 shrink-0" aria-hidden />
@@ -86,7 +86,7 @@ export function Navbar() {
                 الهدايا
               </Link>
               <Link
-                href="/dashboard?tab=admin"
+                href="/admin/pricing"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-2 text-lg font-medium text-muted-foreground transition-colors hover:text-brand-green-dark"
               >

@@ -2,7 +2,7 @@
 /** @jsxImportSource react */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Plus, Edit, Trash2, Search, LogOut, Download, Upload, BarChart3, ClipboardList, FileText, QrCode, DownloadCloud, RefreshCw, AlertTriangle } from "lucide-react";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,6 @@ import {
 
 export function DashboardView() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const confirm = useConfirm();
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [searchQuery, setSearchQuery] = useState("");
@@ -35,7 +34,7 @@ export function DashboardView() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [mounted, setMounted] = useState(false);
   const [visitCount, setVisitCount] = useState<number>(0);
-  const [dashboardTab, setDashboardTab] = useState<"products" | "orders" | "admin">("products");
+  const [dashboardTab, setDashboardTab] = useState<"products" | "orders">("products");
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [reportMonth, setReportMonth] = useState<string>(() => {
     const d = new Date();
@@ -82,13 +81,6 @@ export function DashboardView() {
     setVisitCount(Number.isFinite(n) ? n : 0);
     setOrders(getStoredOrders());
   }, [refetchProducts]);
-
-  useEffect(() => {
-    const tab = String(searchParams.get("tab") ?? "").trim().toLowerCase();
-    if (tab === "admin") setDashboardTab("admin");
-    else if (tab === "orders") setDashboardTab("orders");
-    else if (tab === "products") setDashboardTab("products");
-  }, [searchParams]);
 
   const PRODUCTS_AUTO_REFRESH_MS = 45 * 1000;
   useEffect(() => {
