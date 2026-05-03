@@ -27,6 +27,11 @@ const COLORS = {
   gray700: "#374151",
 };
 
+/** U+200F قبل «:» يمنع ظهور النقطتين في بداية السطر في PDF (RTL). */
+function arColonSuffix(label: string): string {
+  return `${label}\u200f:`;
+}
+
 const styles = StyleSheet.create({
   page: {
     fontFamily: "Tajawal",
@@ -162,20 +167,6 @@ const styles = StyleSheet.create({
     fontWeight: 900,
     color: COLORS.primary,
   },
-  footer: {
-    fontFamily: "Tajawal",
-    marginTop: 14,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray200,
-  },
-  footerText: {
-    fontFamily: "Tajawal",
-    fontSize: 7,
-    color: "#9ca3af",
-    textAlign: "center",
-  },
-  /** سطر «رقماً»: أرقام لاتينية + LTR حتى لا يختلط الفاصل العربي ٬ مع علامات أخرى */
   figuresLine: {
     fontFamily: "Tajawal",
     marginTop: 4,
@@ -248,23 +239,23 @@ export function AdminQuotePDF({
 
         <View style={styles.metaBlock}>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>إلى السيد:</Text>
+            <Text style={styles.metaLabel}>{arColonSuffix("إلى السيد")}</Text>
             <Text style={styles.metaValue}>{meta.toSir || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>البيان:</Text>
+            <Text style={styles.metaLabel}>{arColonSuffix("البيان")}</Text>
             <Text style={styles.metaValue}>{meta.statement || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>رقم الفاتورة:</Text>
+            <Text style={styles.metaLabel}>{arColonSuffix("رقم الفاتورة")}</Text>
             <Text style={styles.metaValue}>{meta.invoiceNo || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>التاريخ:</Text>
+            <Text style={styles.metaLabel}>{arColonSuffix("التاريخ")}</Text>
             <Text style={styles.metaValue}>{meta.documentDateStr}</Text>
           </View>
           <View style={[styles.metaRow, { marginBottom: 0 }]}>
-            <Text style={styles.metaLabel}>العملة:</Text>
+            <Text style={styles.metaLabel}>{arColonSuffix("العملة")}</Text>
             <Text style={styles.metaValue}>{meta.currencyNote}</Text>
           </View>
         </View>
@@ -298,16 +289,12 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.wordsBox}>
-          <Text style={styles.wordsLabel}>المبلغ كتابةً:</Text>
+          <Text style={styles.wordsLabel}>{arColonSuffix("المبلغ كتابةً")}</Text>
           <Text style={styles.wordsText}>{words}</Text>
           <Text style={styles.figuresLine}>
-            <Text>رقماً: </Text>
+            <Text>{`${arColonSuffix("رقماً")} `}</Text>
             <Text style={styles.figuresLtr}>{figuresAmount}</Text>
           </Text>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>قسم الانتاج الفني — تم إنشاء المستند آلياً من لوحة الإدارة</Text>
         </View>
       </Page>
     </Document>
