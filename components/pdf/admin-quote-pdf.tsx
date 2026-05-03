@@ -175,6 +175,22 @@ const styles = StyleSheet.create({
     color: "#9ca3af",
     textAlign: "center",
   },
+  /** سطر «رقماً»: أرقام لاتينية + LTR حتى لا يختلط الفاصل العربي ٬ مع علامات أخرى */
+  figuresLine: {
+    fontFamily: "Tajawal",
+    marginTop: 4,
+    fontSize: 9,
+    fontWeight: 700,
+    color: COLORS.gray700,
+    textAlign: "right",
+  },
+  figuresLtr: {
+    fontFamily: "Tajawal",
+    direction: "ltr",
+    fontSize: 9,
+    fontWeight: 700,
+    color: COLORS.gray700,
+  },
 });
 
 /** Column widths (RTL). ترتيب الأعمدة: رمز، اسم، كمية، وحدة، سعر، قيمة */
@@ -219,6 +235,11 @@ export function AdminQuotePDF({
   currency: "SYP" | "USD";
 }) {
   const words = grandTotalInArabicWords(grandNumericForWords, currency);
+  const n = Number.isFinite(grandNumericForWords) ? Math.max(0, grandNumericForWords) : 0;
+  const figuresAmount =
+    currency === "SYP"
+      ? `${Math.floor(n).toLocaleString("en-US", { maximumFractionDigits: 0 })} ل.س`
+      : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
   return (
     <Document>
@@ -279,7 +300,10 @@ export function AdminQuotePDF({
         <View style={styles.wordsBox}>
           <Text style={styles.wordsLabel}>المبلغ كتابةً:</Text>
           <Text style={styles.wordsText}>{words}</Text>
-          <Text style={[styles.wordsText, { marginTop: 4, fontWeight: 700 }]}>رقماً: {grandTotalText}</Text>
+          <Text style={styles.figuresLine}>
+            <Text>رقماً: </Text>
+            <Text style={styles.figuresLtr}>{figuresAmount}</Text>
+          </Text>
         </View>
 
         <View style={styles.footer}>
