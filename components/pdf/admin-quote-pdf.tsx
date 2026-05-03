@@ -9,8 +9,12 @@ const fontBase =
 Font.register({
   family: "Tajawal",
   fonts: [
+    { src: `${fontBase}/ArbFONTS-Tajawal-ExtraLight.ttf`, fontWeight: 200 },
+    { src: `${fontBase}/ArbFONTS-Tajawal-Light.ttf`, fontWeight: 300 },
     { src: `${fontBase}/ArbFONTS-Tajawal-Regular.ttf`, fontWeight: 400 },
+    { src: `${fontBase}/ArbFONTS-Tajawal-Medium.ttf`, fontWeight: 500 },
     { src: `${fontBase}/ArbFONTS-Tajawal-Bold.ttf`, fontWeight: 700 },
+    { src: `${fontBase}/ArbFONTS-Tajawal-ExtraBold.ttf`, fontWeight: 800 },
     { src: `${fontBase}/ArbFONTS-Tajawal-Black.ttf`, fontWeight: 900 },
   ],
 });
@@ -32,6 +36,7 @@ const styles = StyleSheet.create({
   },
   /** ترويسة المستند */
   letterhead: {
+    fontFamily: "Tajawal",
     fontSize: 18,
     fontWeight: 900,
     color: COLORS.primary,
@@ -42,6 +47,7 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.primary,
   },
   metaBlock: {
+    fontFamily: "Tajawal",
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: 4,
@@ -50,10 +56,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.gray50,
   },
   metaRow: {
+    fontFamily: "Tajawal",
     flexDirection: "row-reverse",
     marginBottom: 4,
   },
   metaLabel: {
+    fontFamily: "Tajawal",
     width: "22%",
     fontSize: 9,
     fontWeight: 700,
@@ -61,24 +69,28 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   metaValue: {
+    fontFamily: "Tajawal",
     flex: 1,
     fontSize: 9,
     color: COLORS.gray700,
     textAlign: "right",
   },
   tableHeader: {
+    fontFamily: "Tajawal",
     flexDirection: "row-reverse",
     backgroundColor: COLORS.primary,
     paddingVertical: 6,
     paddingHorizontal: 4,
   },
   th: {
+    fontFamily: "Tajawal",
     fontSize: 7,
     fontWeight: 700,
     color: COLORS.white,
     textAlign: "center",
   },
   tr: {
+    fontFamily: "Tajawal",
     flexDirection: "row-reverse",
     paddingVertical: 6,
     paddingHorizontal: 4,
@@ -88,19 +100,23 @@ const styles = StyleSheet.create({
     minHeight: 28,
   },
   trEven: {
+    fontFamily: "Tajawal",
     backgroundColor: COLORS.gray50,
   },
   td: {
+    fontFamily: "Tajawal",
     fontSize: 7,
     color: COLORS.gray700,
     textAlign: "center",
   },
   tdName: {
+    fontFamily: "Tajawal",
     textAlign: "right",
     fontWeight: 700,
     color: "#111827",
   },
   wordsBox: {
+    fontFamily: "Tajawal",
     marginTop: 10,
     padding: 10,
     borderWidth: 1,
@@ -109,6 +125,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.gray50,
   },
   wordsLabel: {
+    fontFamily: "Tajawal",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.primary,
@@ -116,12 +133,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   wordsText: {
+    fontFamily: "Tajawal",
     fontSize: 9,
     color: COLORS.gray700,
     textAlign: "right",
     lineHeight: 1.45,
   },
   totalsRow: {
+    fontFamily: "Tajawal",
     marginTop: 8,
     flexDirection: "row-reverse",
     justifyContent: "space-between",
@@ -132,22 +151,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#ecfdf5",
   },
   totalsLabel: {
+    fontFamily: "Tajawal",
     fontSize: 10,
     fontWeight: 700,
     color: COLORS.primary,
   },
   totalsValue: {
+    fontFamily: "Tajawal",
     fontSize: 11,
     fontWeight: 900,
     color: COLORS.primary,
   },
   footer: {
+    fontFamily: "Tajawal",
     marginTop: 14,
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: COLORS.gray200,
   },
   footerText: {
+    fontFamily: "Tajawal",
     fontSize: 7,
     color: "#9ca3af",
     textAlign: "center",
