@@ -154,15 +154,14 @@ const styles = StyleSheet.create({
   },
 });
 
-/** Column widths (RTL). Order: رمز، اسم، كمية، وحدة، سعر، قيمة، مجموع تراكمي */
+/** Column widths (RTL). ترتيب الأعمدة: رمز، اسم، كمية، وحدة، سعر، قيمة */
 const col = {
-  sku: "11%",
-  name: "24%",
-  qty: "7%",
-  unit: "9%",
-  price: "13%",
-  value: "13%",
-  run: "13%",
+  sku: "12%",
+  name: "30%",
+  qty: "8%",
+  unit: "10%",
+  price: "14%",
+  value: "26%",
 };
 
 export type AdminQuoteLine = {
@@ -172,7 +171,6 @@ export type AdminQuoteLine = {
   unit: string;
   unitPriceText: string;
   lineValueText: string;
-  runningTotalText: string;
 };
 
 export type AdminQuotePdfMeta = {
@@ -228,7 +226,6 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.tableHeader}>
-          <Text style={[styles.th, { width: col.run }]}>المجموع النهائي{"\n"}(تراكمي)</Text>
           <Text style={[styles.th, { width: col.value }]}>القيمة</Text>
           <Text style={[styles.th, { width: col.price }]}>السعر</Text>
           <Text style={[styles.th, { width: col.unit }]}>الوحدة</Text>
@@ -241,7 +238,6 @@ export function AdminQuotePDF({
           const rowStyle = i % 2 === 1 ? [styles.tr, styles.trEven] : styles.tr;
           return (
             <View key={`${i}-${l.sku}-${l.name}`} style={rowStyle}>
-              <Text style={[styles.td, { width: col.run }]}>{l.runningTotalText}</Text>
               <Text style={[styles.td, { width: col.value }]}>{l.lineValueText}</Text>
               <Text style={[styles.td, { width: col.price }]}>{l.unitPriceText}</Text>
               <Text style={[styles.td, { width: col.unit }]}>{l.unit}</Text>

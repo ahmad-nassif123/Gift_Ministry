@@ -199,11 +199,9 @@ export function AdminPricingClient() {
         unit: string;
         unitPriceText: string;
         lineValueText: string;
-        runningTotalText: string;
       };
       const pdfLines: PdfLine[] = [];
       let running = 0;
-      let grandNumericForWords = 0;
 
       for (const l of quoteComputed.lines) {
         const qty = Math.max(0, Math.floor(l.qty));
@@ -214,7 +212,6 @@ export function AdminPricingClient() {
           const unitP = Math.floor(unitSyp);
           const lineVal = unitP * qty;
           running += lineVal;
-          grandNumericForWords = running;
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
@@ -222,13 +219,11 @@ export function AdminPricingClient() {
             unit: unitLabel,
             unitPriceText: unitP > 0 ? `${unitP.toLocaleString("ar-SA")} ل.س` : "—",
             lineValueText: unitP > 0 ? `${lineVal.toLocaleString("ar-SA")} ل.س` : "—",
-            runningTotalText: `${running.toLocaleString("ar-SA")} ل.س`,
           });
         } else {
           const unitUsd = unitSyp > 0 ? round2(unitSyp / rate) : 0;
           const lineVal = unitSyp > 0 ? round2((unitSyp * qty) / rate) : 0;
           running = round2(running + lineVal);
-          grandNumericForWords = running;
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
@@ -236,7 +231,6 @@ export function AdminPricingClient() {
             unit: unitLabel,
             unitPriceText: unitSyp > 0 ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—",
             lineValueText: unitSyp > 0 ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—",
-            runningTotalText: `${running.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`,
           });
         }
       }
