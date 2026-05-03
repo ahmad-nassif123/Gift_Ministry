@@ -27,6 +27,12 @@ const COLORS = {
   gray700: "#374151",
 };
 
+/** أرقام عربية شرقية (٠١٢…) — متسقة مع بقية نص PDF وبدون كتلة LTR منفصلة. */
+function formatArabicIndicInt(n: number, grouping = true): string {
+  const v = Math.max(0, Math.floor(Number.isFinite(n) ? n : 0));
+  return v.toLocaleString("ar-SA", { numberingSystem: "arab", useGrouping: grouping });
+}
+
 const styles = StyleSheet.create({
   page: {
     fontFamily: "Tajawal",
@@ -177,24 +183,16 @@ const styles = StyleSheet.create({
     fontWeight: 900,
     color: COLORS.primary,
   },
-  figuresLine: {
+  figuresLineText: {
     fontFamily: "Tajawal",
     marginTop: 4,
-    flexDirection: "row",
-    direction: "rtl",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 4,
-  },
-  figuresLabel: {
-    fontFamily: "Tajawal",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.gray700,
+    textAlign: "right",
   },
-  figuresLtr: {
+  figuresLabel: {
     fontFamily: "Tajawal",
-    direction: "ltr",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.gray700,
@@ -244,10 +242,8 @@ export function AdminQuotePDF({
 }) {
   const words = grandTotalInArabicWords(grandNumericForWords, currency);
   const n = Number.isFinite(grandNumericForWords) ? Math.max(0, grandNumericForWords) : 0;
-  const figuresAmount =
-    currency === "SYP"
-      ? `${Math.floor(n).toLocaleString("en-US", { maximumFractionDigits: 0 })} ل.س`
-      : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  const figuresAmountSyp = `${formatArabicIndicInt(Math.floor(n))} ل.س`;
+  const figuresAmountUsd = `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
   return (
     <Document>
@@ -308,7 +304,9 @@ export function AdminQuotePDF({
               <Text style={[styles.td, { width: col.value }]}>{l.lineValueText}</Text>
               <Text style={[styles.td, { width: col.price }]}>{l.unitPriceText}</Text>
               <Text style={[styles.td, { width: col.unit }]}>{l.unit}</Text>
-              <Text style={[styles.td, { width: col.qty }]}>{l.quantity}</Text>
+              <Text style={[styles.td, { width: col.qty }]}>
+                {currency === "SYP" ? formatArabicIndicInt(l.quantity, false) : String(l.quantity)}
+              </Text>
               <Text style={[styles.td, styles.tdName, { width: col.name }]}>{l.name}</Text>
               <Text style={[styles.td, { width: col.sku }]}>{l.sku || "—"}</Text>
             </View>
@@ -326,11 +324,11 @@ export function AdminQuotePDF({
             <Text style={styles.wordsLabel}>:</Text>
           </View>
           <Text style={styles.wordsText}>{words}</Text>
-          <View style={styles.figuresLine}>
+          <Text style={styles.figuresLineText}>
             <Text style={styles.figuresLabel}>رقماً</Text>
-            <Text style={styles.figuresLabel}>:</Text>
-            <Text style={styles.figuresLtr}>{figuresAmount}</Text>
-          </View>
+            <Text style={styles.figuresLabel}>: </Text>
+            <Text style={styles.figuresLabel}>{currency === "SYP" ? figuresAmountSyp : figuresAmountUsd}</Text>
+          </Text>
         </View>
       </Page>
     </Document>

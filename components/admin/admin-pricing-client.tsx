@@ -217,13 +217,14 @@ export function AdminPricingClient() {
           const unitP = Math.floor(unitSyp);
           const lineVal = unitP * qty;
           running += lineVal;
+          const sypNum = (v: number) => v.toLocaleString("ar-SA", { numberingSystem: "arab" });
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
             quantity: qty,
             unit: unitLabel,
-            unitPriceText: unitP > 0 ? `${unitP.toLocaleString("ar-SA")} ل.س` : "—",
-            lineValueText: unitP > 0 ? `${lineVal.toLocaleString("ar-SA")} ل.س` : "—",
+            unitPriceText: unitP > 0 ? `${sypNum(unitP)} ل.س` : "—",
+            lineValueText: unitP > 0 ? `${sypNum(lineVal)} ل.س` : "—",
           });
         } else {
           const unitUsd = unitSyp > 0 ? round2(unitSyp / rate) : 0;
@@ -242,13 +243,13 @@ export function AdminPricingClient() {
 
       const grandTotalText =
         pdfCurrency === "SYP"
-          ? `${Math.floor(running).toLocaleString("ar-SA")} ل.س`
+          ? `${Math.floor(running).toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س`
           : `${running.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
       const currencyNote =
         pdfCurrency === "SYP"
           ? "الليرة السورية"
-          : `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA")} ل.س للدولار الواحد)`;
+          : `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`;
 
       const blob = await generateAdminQuoteBlob({
         meta: {
