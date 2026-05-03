@@ -27,11 +27,6 @@ const COLORS = {
   gray700: "#374151",
 };
 
-/** U+200F قبل «:» يمنع ظهور النقطتين في بداية السطر في PDF (RTL). */
-function arColonSuffix(label: string): string {
-  return `${label}\u200f:`;
-}
-
 const styles = StyleSheet.create({
   page: {
     fontFamily: "Tajawal",
@@ -65,13 +60,21 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     marginBottom: 4,
   },
-  metaLabel: {
+  /** عمود التسمية: صف عربي + «:» بدون محارف اتجاه خفية (تسبب مربعات في بعض عارضات PDF). */
+  metaLabelWrap: {
     fontFamily: "Tajawal",
     width: "22%",
+    flexDirection: "row",
+    direction: "rtl",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 3,
+  },
+  metaLabel: {
+    fontFamily: "Tajawal",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.primary,
-    textAlign: "right",
   },
   metaValue: {
     fontFamily: "Tajawal",
@@ -129,13 +132,20 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: COLORS.gray50,
   },
+  wordsLabelRow: {
+    fontFamily: "Tajawal",
+    flexDirection: "row",
+    direction: "rtl",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 3,
+    marginBottom: 4,
+  },
   wordsLabel: {
     fontFamily: "Tajawal",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.primary,
-    textAlign: "right",
-    marginBottom: 4,
   },
   wordsText: {
     fontFamily: "Tajawal",
@@ -170,10 +180,17 @@ const styles = StyleSheet.create({
   figuresLine: {
     fontFamily: "Tajawal",
     marginTop: 4,
+    flexDirection: "row",
+    direction: "rtl",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 4,
+  },
+  figuresLabel: {
+    fontFamily: "Tajawal",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.gray700,
-    textAlign: "right",
   },
   figuresLtr: {
     fontFamily: "Tajawal",
@@ -239,23 +256,38 @@ export function AdminQuotePDF({
 
         <View style={styles.metaBlock}>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>{arColonSuffix("إلى السيد")}</Text>
+            <View style={styles.metaLabelWrap}>
+              <Text style={styles.metaLabel}>إلى السيد</Text>
+              <Text style={styles.metaLabel}>:</Text>
+            </View>
             <Text style={styles.metaValue}>{meta.toSir || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>{arColonSuffix("البيان")}</Text>
+            <View style={styles.metaLabelWrap}>
+              <Text style={styles.metaLabel}>البيان</Text>
+              <Text style={styles.metaLabel}>:</Text>
+            </View>
             <Text style={styles.metaValue}>{meta.statement || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>{arColonSuffix("رقم الفاتورة")}</Text>
+            <View style={styles.metaLabelWrap}>
+              <Text style={styles.metaLabel}>رقم الفاتورة</Text>
+              <Text style={styles.metaLabel}>:</Text>
+            </View>
             <Text style={styles.metaValue}>{meta.invoiceNo || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>{arColonSuffix("التاريخ")}</Text>
+            <View style={styles.metaLabelWrap}>
+              <Text style={styles.metaLabel}>التاريخ</Text>
+              <Text style={styles.metaLabel}>:</Text>
+            </View>
             <Text style={styles.metaValue}>{meta.documentDateStr}</Text>
           </View>
           <View style={[styles.metaRow, { marginBottom: 0 }]}>
-            <Text style={styles.metaLabel}>{arColonSuffix("العملة")}</Text>
+            <View style={styles.metaLabelWrap}>
+              <Text style={styles.metaLabel}>العملة</Text>
+              <Text style={styles.metaLabel}>:</Text>
+            </View>
             <Text style={styles.metaValue}>{meta.currencyNote}</Text>
           </View>
         </View>
@@ -289,12 +321,16 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.wordsBox}>
-          <Text style={styles.wordsLabel}>{arColonSuffix("المبلغ كتابةً")}</Text>
+          <View style={styles.wordsLabelRow}>
+            <Text style={styles.wordsLabel}>المبلغ كتابةً</Text>
+            <Text style={styles.wordsLabel}>:</Text>
+          </View>
           <Text style={styles.wordsText}>{words}</Text>
-          <Text style={styles.figuresLine}>
-            <Text>{`${arColonSuffix("رقماً")} `}</Text>
+          <View style={styles.figuresLine}>
+            <Text style={styles.figuresLabel}>رقماً</Text>
+            <Text style={styles.figuresLabel}>:</Text>
             <Text style={styles.figuresLtr}>{figuresAmount}</Text>
-          </Text>
+          </View>
         </View>
       </Page>
     </Document>
