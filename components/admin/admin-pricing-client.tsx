@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Calculator, FileText, LogOut, Plus, Search, X } from "lucide-react";
+import { Calculator, Download, FileText, History, LogOut, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -13,7 +13,71 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Product } from "@/data/products";
 import { cn } from "@/lib/utils";
 
-type QuoteLine = { slug: string; qty: number };
+const INVOICE_LS_KEY = "admin_pricing_invoice_log_v1";
+
+type QuoteProductLine = { kind: "product"; slug: string; qty: number };
+type QuoteCustomLine = { kind: "custom"; id: string; name: string; unitPriceInput: string; qty: number };
+type QuoteLine = QuoteProductLine | QuoteCustomLine;
+
+type InvoiceHistoryRow = {
+  id: string;
+  createdAt: string;
+  invoiceNo: string;
+  documentDateIso: string;
+  toSir: string;
+  statement: string;
+  currency: string;
+  grandTotalText: string;
+  grandNumeric: number;
+  linesCount: number;
+  fromDb: boolean;
+};
+
+function newCustomLineId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `m-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function readLocalInvoiceHistory(): InvoiceHistoryRow[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(INVOICE_LS_KEY);
+    const a = raw ? (JSON.parse(raw) as unknown) : [];
+    if (!Array.isArray(a)) return [];
+    return a
+      .map((x) => {
+        if (!x || typeof x !== "object") return null;
+        const o = x as Record<string, unknown>;
+        return {
+          id: String(o.id ?? ""),
+          createdAt: String(o.createdAt ?? ""),
+          invoiceNo: String(o.invoiceNo ?? ""),
+          documentDateIso: String(o.documentDateIso ?? ""),
+          toSir: String(o.toSir ?? ""),
+          statement: String(o.statement ?? ""),
+          currency: String(o.currency ?? "SYP"),
+          grandTotalText: String(o.grandTotalText ?? ""),
+          grandNumeric: Number(o.grandNumeric) || 0,
+          linesCount: Math.max(0, Math.floor(Number(o.linesCount) || 0)),
+          fromDb: false,
+        } as InvoiceHistoryRow;
+      })
+      .filter((r): r is InvoiceHistoryRow => Boolean(r?.id && r?.createdAt));
+  } catch {
+    return [];
+  }
+}
+
+function appendLocalInvoiceHistory(row: InvoiceHistoryRow): void {
+  if (typeof window === "undefined") return;
+  try {
+    const prev = readLocalInvoiceHistory();
+    const next = [row, ...prev].slice(0, 120);
+    window.localStorage.setItem(INVOICE_LS_KEY, JSON.stringify(next));
+  } catch {
+    //
+  }
+}
 
 function parsePriceNumber(raw: unknown): number {
   const s = String(raw ?? "").trim();
@@ -61,6 +125,11 @@ export function AdminPricingClient() {
   const [adminQuery, setAdminQuery] = useState("");
   const [quoteLines, setQuoteLines] = useState<QuoteLine[]>([]);
   const [quotePdfLoading, setQuotePdfLoading] = useState(false);
+  const [customNameDraft, setCustomNameDraft] = useState("");
+  const [customPriceDraft, setCustomPriceDraft] = useState("");
+  const [customQtyDraft, setCustomQtyDraft] = useState("1");
+  const [invoiceHistory, setInvoiceHistory] = useState<InvoiceHistoryRow[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [savingSlug, setSavingSlug] = useState<string | null>(null);
 
@@ -105,6 +174,42 @@ export function AdminPricingClient() {
     }
   }, []);
 
+  const loadInvoices = useCallback(async () => {
+    setLoadingInvoices(true);
+    try {
+      const res = await fetch("/api/admin/pricing/invoices", { credentials: "include" });
+      const j = (await res.json()) as { success?: boolean; data?: unknown[]; db?: boolean };
+      if (res.ok && j.success && j.db === true && Array.isArray(j.data)) {
+        const mapped: InvoiceHistoryRow[] = j.data.flatMap((raw) => {
+          if (!raw || typeof raw !== "object") return [];
+          const o = raw as Record<string, unknown>;
+          const lineArr = Array.isArray(o.lines) ? o.lines : [];
+          const row: InvoiceHistoryRow = {
+            id: `srv-${o.id}`,
+            createdAt: String(o.createdAt ?? ""),
+            invoiceNo: String(o.invoiceNo ?? ""),
+            documentDateIso: o.documentDateIso != null ? String(o.documentDateIso) : "",
+            toSir: String(o.toSir ?? ""),
+            statement: String(o.statement ?? ""),
+            currency: String(o.currency ?? "SYP"),
+            grandTotalText: String(o.grandTotalText ?? ""),
+            grandNumeric: Number(o.grandNumeric) || 0,
+            linesCount: lineArr.length,
+            fromDb: true,
+          };
+          return [row];
+        });
+        setInvoiceHistory(mapped);
+        return;
+      }
+      setInvoiceHistory(readLocalInvoiceHistory());
+    } catch {
+      setInvoiceHistory(readLocalInvoiceHistory());
+    } finally {
+      setLoadingInvoices(false);
+    }
+  }, []);
+
   useEffect(() => {
     void checkGate();
   }, [checkGate]);
@@ -112,6 +217,10 @@ export function AdminPricingClient() {
   useEffect(() => {
     if (gateOk) void fetchProducts();
   }, [gateOk, fetchProducts]);
+
+  useEffect(() => {
+    if (gateOk) void loadInvoices();
+  }, [gateOk, loadInvoices]);
 
   const bySlug = useMemo(() => new Map(products.map((p) => [p.slug, p] as const)), [products]);
 
@@ -140,45 +249,114 @@ export function AdminPricingClient() {
 
   const addQuoteLine = (slug: string) => {
     setQuoteLines((prev) => {
-      const found = prev.find((x) => x.slug === slug);
-      if (found) return prev.map((x) => (x.slug === slug ? { ...x, qty: Math.min(999999, (x.qty ?? 0) + 1) } : x));
-      return [...prev, { slug, qty: 1 }];
+      const found = prev.find((x) => x.kind === "product" && x.slug === slug);
+      if (found && found.kind === "product")
+        return prev.map((x) =>
+          x.kind === "product" && x.slug === slug ? { ...x, qty: Math.min(999999, (x.qty ?? 0) + 1) } : x
+        );
+      return [...prev, { kind: "product" as const, slug, qty: 1 }];
     });
   };
 
-  const removeQuoteLine = (slug: string) => setQuoteLines((prev) => prev.filter((x) => x.slug !== slug));
-  const setQuoteQty = (slug: string, value: string) => {
+  const addCustomToQuote = () => {
+    const name = customNameDraft.trim();
+    if (!name) {
+      toast.error("أدخل اسم البند.");
+      return;
+    }
+    const unitNum = parsePriceNumber(customPriceDraft);
+    if (unitNum <= 0) {
+      toast.error("أدخل سعراً صالحاً للبند اليدوي.");
+      return;
+    }
+    const qty = Math.max(1, Math.min(999999, Math.floor(Number(customQtyDraft.replace(/[^\d]/g, "")) || 1)));
+    setQuoteLines((prev) => [
+      ...prev,
+      { kind: "custom" as const, id: newCustomLineId(), name, unitPriceInput: customPriceDraft.trim(), qty },
+    ]);
+    setCustomNameDraft("");
+    setCustomPriceDraft("");
+    setCustomQtyDraft("1");
+    toast.success("تمت إضافة بند يدوي.");
+  };
+
+  const removeQuoteLine = (lineKey: string, kind: "product" | "custom") => {
+    setQuoteLines((prev) =>
+      prev.filter((x) =>
+        kind === "product" ? !(x.kind === "product" && x.slug === lineKey) : !(x.kind === "custom" && x.id === lineKey)
+      )
+    );
+  };
+
+  const setQuoteQty = (lineKey: string, kind: "product" | "custom", value: string) => {
     const v = Math.max(0, Math.min(999999, Math.floor(Number(value.replace(/[^\d]/g, "")) || 0)));
-    setQuoteLines((prev) => prev.map((x) => (x.slug === slug ? { ...x, qty: v } : x)));
+    setQuoteLines((prev) =>
+      prev.map((x) => {
+        if (kind === "product" && x.kind === "product" && x.slug === lineKey) return { ...x, qty: v };
+        if (kind === "custom" && x.kind === "custom" && x.id === lineKey) return { ...x, qty: v };
+        return x;
+      })
+    );
+  };
+
+  const setCustomLineName = (id: string, name: string) => {
+    setQuoteLines((prev) => prev.map((x) => (x.kind === "custom" && x.id === id ? { ...x, name } : x)));
+  };
+
+  const setCustomLinePriceInput = (id: string, unitPriceInput: string) => {
+    setQuoteLines((prev) => prev.map((x) => (x.kind === "custom" && x.id === id ? { ...x, unitPriceInput } : x)));
   };
 
   const quoteComputed = useMemo(() => {
-    const lines = quoteLines
-      .map((l) => {
-        const p = bySlug.get(l.slug);
-        if (!p) return null;
-        const qty = Math.max(0, Math.floor(l.qty ?? 0));
-        const unitNum = parsePriceNumber(p.price);
-        const totalNum = unitNum * qty;
-        return {
-          slug: l.slug,
-          sku: p.sku,
-          name: p.name,
-          unitPriceText: normalizeSypCurrencyLabel((p.price ?? "").trim()) || "—",
-          unitNum,
-          qty,
-          totalNum,
-        };
-      })
-      .filter(Boolean) as {
-      slug: string;
+    type Computed = {
+      rowKey: string;
+      lineKind: "product" | "custom";
+      slug?: string;
+      customId?: string;
       sku: string;
       name: string;
       unitPriceText: string;
       unitNum: number;
       qty: number;
       totalNum: number;
-    }[];
+    };
+    const lines: Computed[] = [];
+    for (const l of quoteLines) {
+      if (l.kind === "custom") {
+        const qty = Math.max(0, Math.floor(l.qty ?? 0));
+        const unitNum = parsePriceNumber(l.unitPriceInput);
+        const totalNum = unitNum * qty;
+        const unitPriceText = normalizeSypCurrencyLabel(l.unitPriceInput.trim()) || "—";
+        lines.push({
+          rowKey: l.id,
+          lineKind: "custom",
+          customId: l.id,
+          sku: "—",
+          name: l.name.trim() || "بند يدوي",
+          unitPriceText,
+          unitNum,
+          qty,
+          totalNum,
+        });
+        continue;
+      }
+      const p = bySlug.get(l.slug);
+      if (!p) continue;
+      const qty = Math.max(0, Math.floor(l.qty ?? 0));
+      const unitNum = parsePriceNumber(p.price);
+      const totalNum = unitNum * qty;
+      lines.push({
+        rowKey: l.slug,
+        lineKind: "product",
+        slug: l.slug,
+        sku: p.sku,
+        name: p.name,
+        unitPriceText: normalizeSypCurrencyLabel((p.price ?? "").trim()) || "—",
+        unitNum,
+        qty,
+        totalNum,
+      });
+    }
     const grand = lines.reduce((s, x) => s + (x.totalNum ?? 0), 0);
     return { lines, grand };
   }, [quoteLines, bySlug]);
@@ -205,6 +383,15 @@ export function AdminPricingClient() {
         lineValueText: string;
       };
       const pdfLines: PdfLine[] = [];
+      type Snap = {
+        sku: string;
+        name: string;
+        qty: number;
+        unitPriceText: string;
+        lineValueText: string;
+        custom?: boolean;
+      };
+      const lineSnapshots: Snap[] = [];
       let running = 0;
 
       for (const l of quoteComputed.lines) {
@@ -217,23 +404,45 @@ export function AdminPricingClient() {
           const lineVal = unitP * qty;
           running += lineVal;
           const sypNum = (v: number) => v.toLocaleString("ar-SA", { numberingSystem: "arab" });
+          const unitPriceText = unitP > 0 ? `${sypNum(unitP)} ل.س` : "—";
+          const lineValueText = unitP > 0 ? `${sypNum(lineVal)} ل.س` : "—";
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
             unit: unitLabel,
-            unitPriceText: unitP > 0 ? `${sypNum(unitP)} ل.س` : "—",
-            lineValueText: unitP > 0 ? `${sypNum(lineVal)} ل.س` : "—",
+            unitPriceText,
+            lineValueText,
+          });
+          lineSnapshots.push({
+            sku: l.sku || "—",
+            name: l.name,
+            qty,
+            unitPriceText,
+            lineValueText,
+            custom: l.lineKind === "custom",
           });
         } else {
           const unitUsd = unitSyp > 0 ? round2(unitSyp / rate) : 0;
           const lineVal = unitSyp > 0 ? round2((unitSyp * qty) / rate) : 0;
           running = round2(running + lineVal);
+          const unitPriceText =
+            unitSyp > 0 ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—";
+          const lineValueText =
+            unitSyp > 0 ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—";
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
             unit: unitLabel,
-            unitPriceText: unitSyp > 0 ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—",
-            lineValueText: unitSyp > 0 ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—",
+            unitPriceText,
+            lineValueText,
+          });
+          lineSnapshots.push({
+            sku: l.sku || "—",
+            name: l.name,
+            qty,
+            unitPriceText,
+            lineValueText,
+            custom: l.lineKind === "custom",
           });
         }
       }
@@ -268,12 +477,86 @@ export function AdminPricingClient() {
       a.download = `فاتورة-${safeInv || "عرض-أسعار"}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+
+      const logRow: InvoiceHistoryRow = {
+        id: newCustomLineId(),
+        createdAt: new Date().toISOString(),
+        invoiceNo: invoiceNo.trim(),
+        documentDateIso: invoiceDate,
+        toSir: toSir.trim(),
+        statement: statement.trim(),
+        currency: pdfCurrency,
+        grandTotalText,
+        grandNumeric: pdfCurrency === "SYP" ? Math.floor(running) : running,
+        linesCount: lineSnapshots.length,
+        fromDb: false,
+      };
+
+      const pushLocalLog = () => {
+        appendLocalInvoiceHistory(logRow);
+        setInvoiceHistory((h) => [logRow, ...h].slice(0, 120));
+      };
+
+      try {
+        const logRes = await fetch("/api/admin/pricing/invoices/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            invoiceNo: invoiceNo.trim(),
+            documentDateIso: invoiceDate,
+            toSir: toSir.trim(),
+            statement: statement.trim(),
+            currency: pdfCurrency,
+            usdRate: pdfCurrency === "USD" ? String(usdRate).trim() : null,
+            grandTotalText,
+            grandNumeric: pdfCurrency === "SYP" ? Math.floor(running) : running,
+            lines: lineSnapshots,
+          }),
+        });
+        const lj = (await logRes.json()) as { success?: boolean; stored?: boolean };
+        if (logRes.ok && lj.success && lj.stored) {
+          await loadInvoices();
+        } else {
+          pushLocalLog();
+        }
+      } catch {
+        pushLocalLog();
+      }
     } catch (e) {
       console.error(e);
       toast.error("تعذر إنشاء PDF للأسعار.");
     } finally {
       setQuotePdfLoading(false);
     }
+  };
+
+  const downloadProductsExcel = () => {
+    const rows = products
+      .filter((p) => !p.archived)
+      .map((p, i) => ({
+        التسلسل: i + 1,
+        "اسم الهدية": p.name,
+        SKU: p.sku,
+        السعر: String(priceDrafts[p.slug] ?? p.price ?? "").trim(),
+        slug: p.slug,
+      }));
+    if (rows.length === 0) {
+      toast.message("لا توجد هدايا للتصدير.");
+      return;
+    }
+    void import("xlsx")
+      .then((XLSX) => {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "الهدايا");
+        const name = `هدايا-أسعار-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        XLSX.writeFile(wb, name);
+        toast.success("تم تنزيل ملف Excel.");
+      })
+      .catch(() => {
+        toast.error("تعذر إنشاء ملف Excel.");
+      });
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -312,6 +595,10 @@ export function AdminPricingClient() {
     setQuoteLines([]);
     setPriceDrafts({});
     setSavingSlug(null);
+    setCustomNameDraft("");
+    setCustomPriceDraft("");
+    setCustomQtyDraft("1");
+    setInvoiceHistory([]);
     setToSir("");
     setStatement("");
     setPdfCurrency("SYP");
@@ -413,6 +700,16 @@ export function AdminPricingClient() {
               <p className="text-sm text-muted-foreground sm:text-base">عرض الأسعار وحساب الإجمالي وتصدير PDF.</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-[44px]"
+                onClick={() => downloadProductsExcel()}
+                disabled={loadingProducts || products.filter((p) => !p.archived).length === 0}
+              >
+                <Download className="ml-2 h-4 w-4" />
+                Excel
+              </Button>
               <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => void fetchProducts()} disabled={loadingProducts}>
                 {loadingProducts ? "جاري التحديث..." : "تحديث القائمة"}
               </Button>
@@ -422,6 +719,64 @@ export function AdminPricingClient() {
               </Button>
             </div>
           </div>
+
+          <Card className="mb-6">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-4">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <History className="h-5 w-5 shrink-0" />
+                سجل الفواتير الصادرة
+              </CardTitle>
+              <Button type="button" variant="outline" size="sm" className="min-h-[44px]" onClick={() => void loadInvoices()} disabled={loadingInvoices}>
+                {loadingInvoices ? "جاري التحميل..." : "تحديث السجل"}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {invoiceHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  لا توجد فواتير مسجّلة بعد. يُضاف سجل تلقائياً عند كل تحميل PDF بنجاح. عند توفر Postgres تُخزّن في القاعدة؛ وإلا يُحفظ السجل في هذا المتصفح فقط.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
+                  <table className="w-full min-w-[640px] text-right text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="p-3">التاريخ</th>
+                        <th className="p-3">رقم الفاتورة</th>
+                        <th className="p-3">إلى السيد</th>
+                        <th className="p-3">المجموع</th>
+                        <th className="p-3 w-20">العملة</th>
+                        <th className="p-3 w-16">البنود</th>
+                        <th className="p-3 w-24">المصدر</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoiceHistory.map((row) => (
+                        <tr key={row.id} className="border-t align-middle">
+                          <td className="p-3 whitespace-nowrap text-xs tabular-nums sm:text-sm">
+                            {(() => {
+                              try {
+                                return new Date(row.createdAt).toLocaleString("ar-SY");
+                              } catch {
+                                return row.createdAt;
+                              }
+                            })()}
+                          </td>
+                          <td className="p-3 font-medium">{row.invoiceNo || "—"}</td>
+                          <td className="p-3 max-w-[160px] truncate" title={row.toSir || undefined}>
+                            {row.toSir || "—"}
+                          </td>
+                          <td className="p-3 tabular-nums">{row.grandTotalText || "—"}</td>
+                          <td className="p-3">{row.currency === "USD" ? "USD" : "ل.س"}</td>
+                          <td className="p-3 text-center tabular-nums">{row.linesCount}</td>
+                          <td className="p-3 text-muted-foreground text-xs">{row.fromDb ? "قاعدة" : "محلي"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card className="mb-6">
             <CardHeader>
@@ -536,7 +891,7 @@ export function AdminPricingClient() {
                     ) : (
                       <ul className="space-y-2">
                         {adminSearchResults.map((p) => {
-                          const already = quoteLines.some((x) => x.slug === p.slug);
+                          const already = quoteLines.some((x) => x.kind === "product" && x.slug === p.slug);
                           return (
                             <li key={p.slug} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3">
                               <div className="min-w-0">
@@ -559,6 +914,60 @@ export function AdminPricingClient() {
                 </Card>
               )}
 
+              <Card className="border-primary/25">
+                <CardHeader className="py-4">
+                  <CardTitle className="text-base">بند يدوي (غير مضاف للموقع)</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    أدخل اسماً وسعراً وكمية دون إنشاء منتج في الكتالوج — يظهر في الحاسبة وفي PDF مثل باقي البنود.
+                  </p>
+                </CardHeader>
+                <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="sm:col-span-2">
+                    <label htmlFor="custom-line-name" className="mb-1 block text-sm text-muted-foreground">
+                      اسم البند
+                    </label>
+                    <Input
+                      id="custom-line-name"
+                      value={customNameDraft}
+                      onChange={(e) => setCustomNameDraft(e.target.value)}
+                      placeholder="مثال: تغليف خاص"
+                      className="min-h-[44px]"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="custom-line-price" className="mb-1 block text-sm text-muted-foreground">
+                      السعر (ل.س)
+                    </label>
+                    <Input
+                      id="custom-line-price"
+                      value={customPriceDraft}
+                      onChange={(e) => setCustomPriceDraft(e.target.value)}
+                      placeholder="مثال: 15000"
+                      inputMode="decimal"
+                      className="min-h-[44px]"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="custom-line-qty" className="mb-1 block text-sm text-muted-foreground">
+                      العدد
+                    </label>
+                    <Input
+                      id="custom-line-qty"
+                      value={customQtyDraft}
+                      onChange={(e) => setCustomQtyDraft(e.target.value)}
+                      inputMode="numeric"
+                      className="min-h-[44px]"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-4">
+                    <Button type="button" className="min-h-[44px]" onClick={() => addCustomToQuote()}>
+                      <Plus className="ml-2 h-4 w-4" />
+                      إضافة للحاسبة
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader className="py-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -571,7 +980,7 @@ export function AdminPricingClient() {
                 </CardHeader>
                 <CardContent>
                   {quoteComputed.lines.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">لا توجد هدايا ضمن الحاسبة بعد.</p>
+                    <p className="text-sm text-muted-foreground">لا توجد بنود في الحاسبة بعد.</p>
                   ) : (
                     <>
                       <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -579,38 +988,80 @@ export function AdminPricingClient() {
                           <thead className="bg-muted">
                             <tr>
                               <th className="p-3 w-10">#</th>
-                              <th className="p-3">الهدية</th>
+                              <th className="p-3 w-24">المصدر</th>
+                              <th className="p-3">الاسم</th>
                               <th className="p-3 w-24">SKU</th>
-                              <th className="p-3 w-28">السعر الفردي</th>
+                              <th className="p-3 min-w-[120px]">السعر الفردي</th>
                               <th className="p-3 w-28">الكمية</th>
                               <th className="p-3 w-28">الإجمالي</th>
                               <th className="p-3 w-16">حذف</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {quoteComputed.lines.map((l, idx) => (
-                              <tr key={l.slug} className="border-t align-middle">
-                                <td className="p-3">{idx + 1}</td>
-                                <td className="p-3 font-medium">{l.name}</td>
-                                <td className="p-3">{l.sku || "—"}</td>
-                                <td className="p-3">{l.unitPriceText || "—"}</td>
-                                <td className="p-3">
-                                  <Input
-                                    value={String(l.qty)}
-                                    onChange={(e) => setQuoteQty(l.slug, e.target.value)}
-                                    inputMode="numeric"
-                                    className="min-h-[44px] w-28 text-center tabular-nums"
-                                  />
-                                </td>
-                                <td className="p-3 tabular-nums">{l.unitNum > 0 ? formatMoney(l.totalNum) : "—"}</td>
-                                <td className="p-3">
-                                  <Button type="button" variant="destructive" size="sm" className="min-h-[44px]" onClick={() => removeQuoteLine(l.slug)}>
-                                    <X className="h-4 w-4" />
-                                    <span className="sr-only">حذف</span>
-                                  </Button>
-                                </td>
-                              </tr>
-                            ))}
+                            {quoteComputed.lines.map((l, idx) => {
+                              const rawCustom =
+                                l.lineKind === "custom" && l.customId
+                                  ? (quoteLines.find((x) => x.kind === "custom" && x.id === l.customId) as QuoteCustomLine | undefined)
+                                  : undefined;
+                              return (
+                                <tr key={l.rowKey} className="border-t align-middle">
+                                  <td className="p-3">{idx + 1}</td>
+                                  <td className="p-3">
+                                    {l.lineKind === "custom" ? (
+                                      <Badge variant="secondary">يدوي</Badge>
+                                    ) : (
+                                      <Badge variant="outline">موقع</Badge>
+                                    )}
+                                  </td>
+                                  <td className="p-3">
+                                    {l.lineKind === "custom" && l.customId ? (
+                                      <Input
+                                        value={rawCustom?.name ?? ""}
+                                        onChange={(e) => setCustomLineName(l.customId!, e.target.value)}
+                                        className="min-h-[44px] font-medium"
+                                      />
+                                    ) : (
+                                      <span className="font-medium">{l.name}</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3">{l.sku || "—"}</td>
+                                  <td className="p-3">
+                                    {l.lineKind === "custom" && l.customId ? (
+                                      <Input
+                                        value={rawCustom?.unitPriceInput ?? ""}
+                                        onChange={(e) => setCustomLinePriceInput(l.customId!, e.target.value)}
+                                        inputMode="decimal"
+                                        className="min-h-[44px] tabular-nums"
+                                        placeholder="ل.س"
+                                      />
+                                    ) : (
+                                      l.unitPriceText || "—"
+                                    )}
+                                  </td>
+                                  <td className="p-3">
+                                    <Input
+                                      value={String(l.qty)}
+                                      onChange={(e) => setQuoteQty(l.rowKey, l.lineKind, e.target.value)}
+                                      inputMode="numeric"
+                                      className="min-h-[44px] w-28 text-center tabular-nums"
+                                    />
+                                  </td>
+                                  <td className="p-3 tabular-nums">{l.unitNum > 0 ? formatMoney(l.totalNum) : "—"}</td>
+                                  <td className="p-3">
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      className="min-h-[44px]"
+                                      onClick={() => removeQuoteLine(l.rowKey, l.lineKind)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                      <span className="sr-only">حذف</span>
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -677,7 +1128,7 @@ export function AdminPricingClient() {
                                   size="sm"
                                   className="min-h-[44px]"
                                   onClick={() => addQuoteLine(p.slug)}
-                                  disabled={quoteLines.some((x) => x.slug === p.slug)}
+                                  disabled={quoteLines.some((x) => x.kind === "product" && x.slug === p.slug)}
                                 >
                                   <Plus className="ml-2 h-4 w-4" /> إضافة
                                 </Button>
