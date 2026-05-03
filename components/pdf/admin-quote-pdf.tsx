@@ -201,6 +201,38 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     color: COLORS.gray700,
   },
+  /** المستلم يميناً، المسلّم يساراً (صف RTL). */
+  signatureRow: {
+    fontFamily: "Tajawal",
+    marginTop: 28,
+    paddingTop: 16,
+    paddingHorizontal: 4,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray200,
+    flexDirection: "row",
+    direction: "rtl",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  signatureBlock: {
+    fontFamily: "Tajawal",
+    width: "40%",
+    alignItems: "center",
+  },
+  signatureTitle: {
+    fontFamily: "Tajawal",
+    fontSize: 10,
+    fontWeight: 700,
+    color: COLORS.gray700,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  signatureLine: {
+    width: "100%",
+    minHeight: 22,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray700,
+  },
 });
 
 /** عرض الأعمدة (row-reverse: أول عنصر = أقصى اليمين). الترتيب: رمز المادة، اسم المادة، الوحدة، السعر، القيمة */
@@ -327,6 +359,17 @@ export function AdminQuotePDF({
             <Text style={styles.figuresLabel}>: </Text>
             <Text style={styles.figuresLabel}>{currency === "SYP" ? figuresAmountSyp : figuresAmountUsd}</Text>
           </Text>
+        </View>
+
+        <View style={styles.signatureRow}>
+          <View style={styles.signatureBlock}>
+            <Text style={styles.signatureTitle}>المستلم</Text>
+            <View style={styles.signatureLine} />
+          </View>
+          <View style={styles.signatureBlock}>
+            <Text style={styles.signatureTitle}>المسلّم</Text>
+            <View style={styles.signatureLine} />
+          </View>
         </View>
       </Page>
     </Document>
