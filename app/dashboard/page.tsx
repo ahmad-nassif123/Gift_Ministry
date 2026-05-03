@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardView } from "./dashboard-view";
 
@@ -18,7 +18,10 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (authOk === false) router.replace("/login");
+    if (authOk === false) {
+      const next = `${window.location.pathname}${window.location.search}`;
+      router.replace(`/login?next=${encodeURIComponent(next)}`);
+    }
   }, [authOk, router]);
 
   if (authOk === null) {
@@ -33,5 +36,15 @@ export default function DashboardPage() {
     return null;
   }
 
-  return <DashboardView />;
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p className="text-muted-foreground">جاري التحميل...</p>
+        </div>
+      }
+    >
+      <DashboardView />
+    </React.Suspense>
+  );
 }

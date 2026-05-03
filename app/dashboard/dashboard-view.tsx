@@ -2,7 +2,7 @@
 /** @jsxImportSource react */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Edit, Trash2, Search, LogOut, Download, Upload, BarChart3, ClipboardList, FileText, QrCode, DownloadCloud, RefreshCw, AlertTriangle } from "lucide-react";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
 
 export function DashboardView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const confirm = useConfirm();
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,6 +82,13 @@ export function DashboardView() {
     setVisitCount(Number.isFinite(n) ? n : 0);
     setOrders(getStoredOrders());
   }, [refetchProducts]);
+
+  useEffect(() => {
+    const tab = String(searchParams.get("tab") ?? "").trim().toLowerCase();
+    if (tab === "admin") setDashboardTab("admin");
+    else if (tab === "orders") setDashboardTab("orders");
+    else if (tab === "products") setDashboardTab("products");
+  }, [searchParams]);
 
   const PRODUCTS_AUTO_REFRESH_MS = 45 * 1000;
   useEffect(() => {
