@@ -199,20 +199,18 @@ const styles = StyleSheet.create({
   },
 });
 
-/** Column widths (RTL). ترتيب الأعمدة: رمز، اسم، كمية، وحدة، سعر، قيمة */
+/** عرض الأعمدة (row-reverse: أول عنصر = أقصى اليمين). الترتيب: رمز المادة، اسم المادة، الوحدة، السعر، القيمة */
 const col = {
-  sku: "12%",
-  name: "30%",
-  qty: "8%",
-  unit: "10%",
-  price: "14%",
-  value: "26%",
+  sku: "14%",
+  name: "36%",
+  unit: "11%",
+  price: "17%",
+  value: "22%",
 };
 
 export type AdminQuoteLine = {
   sku: string;
   name: string;
-  quantity: number;
   unit: string;
   unitPriceText: string;
   lineValueText: string;
@@ -289,26 +287,22 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.tableHeader}>
-          <Text style={[styles.th, { width: col.value }]}>القيمة</Text>
-          <Text style={[styles.th, { width: col.price }]}>السعر</Text>
-          <Text style={[styles.th, { width: col.unit }]}>الوحدة</Text>
-          <Text style={[styles.th, { width: col.qty }]}>الكمية</Text>
-          <Text style={[styles.th, { width: col.name, textAlign: "right" }]}>اسم المادة</Text>
           <Text style={[styles.th, { width: col.sku }]}>رمز المادة</Text>
+          <Text style={[styles.th, { width: col.name, textAlign: "right" }]}>اسم المادة</Text>
+          <Text style={[styles.th, { width: col.unit }]}>الوحدة</Text>
+          <Text style={[styles.th, { width: col.price }]}>السعر</Text>
+          <Text style={[styles.th, { width: col.value }]}>القيمة</Text>
         </View>
 
         {lines.map((l, i) => {
           const rowStyle = i % 2 === 1 ? [styles.tr, styles.trEven] : styles.tr;
           return (
             <View key={`${i}-${l.sku}-${l.name}`} style={rowStyle}>
-              <Text style={[styles.td, { width: col.value }]}>{l.lineValueText}</Text>
-              <Text style={[styles.td, { width: col.price }]}>{l.unitPriceText}</Text>
-              <Text style={[styles.td, { width: col.unit }]}>{l.unit}</Text>
-              <Text style={[styles.td, { width: col.qty }]}>
-                {currency === "SYP" ? formatArabicIndicInt(l.quantity, false) : String(l.quantity)}
-              </Text>
-              <Text style={[styles.td, styles.tdName, { width: col.name }]}>{l.name}</Text>
               <Text style={[styles.td, { width: col.sku }]}>{l.sku || "—"}</Text>
+              <Text style={[styles.td, styles.tdName, { width: col.name }]}>{l.name}</Text>
+              <Text style={[styles.td, { width: col.unit }]}>{l.unit}</Text>
+              <Text style={[styles.td, { width: col.price }]}>{l.unitPriceText}</Text>
+              <Text style={[styles.td, { width: col.value }]}>{l.lineValueText}</Text>
             </View>
           );
         })}

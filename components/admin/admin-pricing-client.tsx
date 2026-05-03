@@ -200,7 +200,6 @@ export function AdminPricingClient() {
       type PdfLine = {
         sku: string;
         name: string;
-        quantity: number;
         unit: string;
         unitPriceText: string;
         lineValueText: string;
@@ -221,7 +220,6 @@ export function AdminPricingClient() {
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
-            quantity: qty,
             unit: unitLabel,
             unitPriceText: unitP > 0 ? `${sypNum(unitP)} ل.س` : "—",
             lineValueText: unitP > 0 ? `${sypNum(lineVal)} ل.س` : "—",
@@ -233,7 +231,6 @@ export function AdminPricingClient() {
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
-            quantity: qty,
             unit: unitLabel,
             unitPriceText: unitSyp > 0 ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—",
             lineValueText: unitSyp > 0 ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—",
