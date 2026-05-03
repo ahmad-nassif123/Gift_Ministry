@@ -163,8 +163,10 @@ const styles = StyleSheet.create({
   totalsRow: {
     fontFamily: "Tajawal",
     marginTop: 8,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
+    direction: "rtl",
     justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 6,
     paddingHorizontal: 8,
     borderWidth: 1,
@@ -176,12 +178,14 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 700,
     color: COLORS.primary,
+    textAlign: "right",
   },
   totalsValue: {
     fontFamily: "Tajawal",
     fontSize: 11,
     fontWeight: 900,
     color: COLORS.primary,
+    textAlign: "left",
   },
   figuresLineText: {
     fontFamily: "Tajawal",
@@ -308,8 +312,8 @@ export function AdminQuotePDF({
         })}
 
         <View style={styles.totalsRow}>
-          <Text style={styles.totalsValue}>{grandTotalText}</Text>
           <Text style={styles.totalsLabel}>المجموع النهائي</Text>
+          <Text style={styles.totalsValue}>{grandTotalText}</Text>
         </View>
 
         <View style={styles.wordsBox}>
