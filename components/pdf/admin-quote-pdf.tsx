@@ -27,12 +27,6 @@ const COLORS = {
   gray700: "#374151",
 };
 
-/**
- * لا تستخدم U+061C أو علامات bidi أخرى داخل نص واحد مع Tajawal في react-pdf:
- * المحارف غير الموجودة في ملف TTF تُستبدل برموز خاطئة (مثل «ث») وتفسد الحروف المجاورة.
- * ضع «:» في <Text> منفصل داخل صف flex + direction: "rtl" (انظر metaLabelCell، wordsTitleRow، figuresTitleRow).
- */
-
 /** أرقام عربية شرقية (٠١٢…) — متسقة مع بقية نص PDF وبدون كتلة LTR منفصلة. */
 function formatArabicIndicInt(n: number, grouping = true): string {
   const v = Math.max(0, Math.floor(Number.isFinite(n) ? n : 0));
@@ -106,26 +100,13 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     marginBottom: 4,
   },
-  /** عمود التسمية: عربي يميناً ثم «:» يسار الكلمة (بدون محارف bidi في السلسلة). */
-  metaLabelCell: {
-    width: "22%",
-    flexDirection: "row",
-    direction: "rtl",
-    alignItems: "center",
-  },
-  metaLabelText: {
+  metaLabel: {
     fontFamily: "Tajawal",
+    width: "22%",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.primary,
     textAlign: "right",
-    flex: 1,
-  },
-  metaLabelColon: {
-    fontFamily: "Tajawal",
-    fontSize: 9,
-    fontWeight: 700,
-    color: COLORS.primary,
   },
   metaValue: {
     fontFamily: "Tajawal",
@@ -183,25 +164,13 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: COLORS.gray50,
   },
-  wordsTitleRow: {
-    flexDirection: "row",
-    direction: "rtl",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    marginBottom: 4,
-  },
-  wordsLabelText: {
+  wordsLabel: {
     fontFamily: "Tajawal",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.primary,
     textAlign: "right",
-  },
-  wordsColon: {
-    fontFamily: "Tajawal",
-    fontSize: 9,
-    fontWeight: 700,
-    color: COLORS.primary,
+    marginBottom: 4,
   },
   wordsText: {
     fontFamily: "Tajawal",
@@ -251,12 +220,6 @@ const styles = StyleSheet.create({
     color: COLORS.gray700,
     textAlign: "right",
   },
-  figuresColon: {
-    fontFamily: "Tajawal",
-    fontSize: 9,
-    fontWeight: 700,
-    color: COLORS.gray700,
-  },
   figuresAmountText: {
     fontFamily: "Tajawal",
     fontSize: 9,
@@ -298,18 +261,21 @@ const styles = StyleSheet.create({
   },
 });
 
-/** عرض الأعمدة (row-reverse: أول عنصر = أقصى اليمين). الترتيب: رمز المادة، اسم المادة، الوحدة، السعر، القيمة */
+/** عرض الأعمدة (row-reverse: أول عنصر = أقصى اليمين). الترتيب: رمز، اسم، عدد، وحدة، سعر، قيمة */
 const col = {
-  sku: "14%",
-  name: "36%",
-  unit: "11%",
-  price: "17%",
+  sku: "12%",
+  name: "30%",
+  qty: "9%",
+  unit: "9%",
+  price: "18%",
   value: "22%",
 };
 
 export type AdminQuoteLine = {
   sku: string;
   name: string;
+  /** كمية السطر (تُعرض في عمود العدد بعد اسم المادة). */
+  qty: number;
   unit: string;
   unitPriceText: string;
   lineValueText: string;
@@ -361,38 +327,23 @@ export function AdminQuotePDF({
 
         <View style={styles.metaBlock}>
           <View style={styles.metaRow}>
-            <View style={styles.metaLabelCell}>
-              <Text style={styles.metaLabelText}>إلى السيد</Text>
-              <Text style={styles.metaLabelColon}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>إلى السيد</Text>
             <Text style={styles.metaValue}>{meta.toSir || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <View style={styles.metaLabelCell}>
-              <Text style={styles.metaLabelText}>البيان</Text>
-              <Text style={styles.metaLabelColon}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>البيان</Text>
             <Text style={styles.metaValue}>{meta.statement || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <View style={styles.metaLabelCell}>
-              <Text style={styles.metaLabelText}>رقم الفاتورة</Text>
-              <Text style={styles.metaLabelColon}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>رقم الفاتورة</Text>
             <Text style={styles.metaValue}>{meta.invoiceNo || "—"}</Text>
           </View>
           <View style={styles.metaRow}>
-            <View style={styles.metaLabelCell}>
-              <Text style={styles.metaLabelText}>التاريخ</Text>
-              <Text style={styles.metaLabelColon}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>التاريخ</Text>
             <Text style={styles.metaValue}>{meta.documentDateStr}</Text>
           </View>
           <View style={[styles.metaRow, { marginBottom: 0 }]}>
-            <View style={styles.metaLabelCell}>
-              <Text style={styles.metaLabelText}>العملة</Text>
-              <Text style={styles.metaLabelColon}>:</Text>
-            </View>
+            <Text style={styles.metaLabel}>العملة</Text>
             <Text style={styles.metaValue}>{meta.currencyNote}</Text>
           </View>
         </View>
@@ -400,6 +351,7 @@ export function AdminQuotePDF({
         <View style={styles.tableHeader}>
           <Text style={[styles.th, { width: col.sku }]}>رمز المادة</Text>
           <Text style={[styles.th, { width: col.name, textAlign: "right" }]}>اسم المادة</Text>
+          <Text style={[styles.th, { width: col.qty }]}>العدد</Text>
           <Text style={[styles.th, { width: col.unit }]}>الوحدة</Text>
           <Text style={[styles.th, { width: col.price }]}>السعر</Text>
           <Text style={[styles.th, { width: col.value }]}>القيمة</Text>
@@ -407,10 +359,14 @@ export function AdminQuotePDF({
 
         {lines.map((l, i) => {
           const rowStyle = i % 2 === 1 ? [styles.tr, styles.trEven] : styles.tr;
+          const q = Math.max(0, Math.floor(Number.isFinite(l.qty) ? l.qty : 0));
+          const qtyText =
+            currency === "SYP" ? formatArabicIndicInt(q, false) : String(q);
           return (
-            <View key={`${i}-${l.sku}-${l.name}`} style={rowStyle}>
+            <View key={`${i}-${l.sku}-${l.name}-${q}`} style={rowStyle}>
               <Text style={[styles.td, { width: col.sku }]}>{l.sku || "—"}</Text>
               <Text style={[styles.td, styles.tdName, { width: col.name }]}>{l.name}</Text>
+              <Text style={[styles.td, { width: col.qty }]}>{qtyText}</Text>
               <Text style={[styles.td, { width: col.unit }]}>{l.unit}</Text>
               <Text style={[styles.td, { width: col.price }]}>{l.unitPriceText}</Text>
               <Text style={[styles.td, { width: col.value }]}>{l.lineValueText}</Text>
@@ -424,14 +380,10 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.wordsBox}>
-          <View style={styles.wordsTitleRow}>
-            <Text style={styles.wordsLabelText}>المبلغ كتابةً</Text>
-            <Text style={styles.wordsColon}>:</Text>
-          </View>
+          <Text style={styles.wordsLabel}>المبلغ كتابةً</Text>
           <Text style={styles.wordsText}>{words}</Text>
           <View style={styles.figuresTitleRow}>
             <Text style={styles.figuresLabelText}>رقماً</Text>
-            <Text style={styles.figuresColon}>:</Text>
             <Text style={styles.figuresAmountText}>
               {currency === "SYP" ? figuresAmountSyp : figuresAmountUsd}
             </Text>

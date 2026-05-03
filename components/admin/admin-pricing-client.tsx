@@ -378,6 +378,7 @@ export function AdminPricingClient() {
       type PdfLine = {
         sku: string;
         name: string;
+        qty: number;
         unit: string;
         unitPriceText: string;
         lineValueText: string;
@@ -409,6 +410,7 @@ export function AdminPricingClient() {
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
+            qty,
             unit: unitLabel,
             unitPriceText,
             lineValueText,
@@ -432,6 +434,7 @@ export function AdminPricingClient() {
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
+            qty,
             unit: unitLabel,
             unitPriceText,
             lineValueText,
