@@ -39,6 +39,8 @@ export function AdminPricingClient() {
   const [adminQuery, setAdminQuery] = useState("");
   const [quoteLines, setQuoteLines] = useState<QuoteLine[]>([]);
   const [quotePdfLoading, setQuotePdfLoading] = useState(false);
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [savingSlug, setSavingSlug] = useState<string | null>(null);
 
   const checkGate = useCallback(async () => {
     try {
@@ -77,6 +79,18 @@ export function AdminPricingClient() {
   }, [gateOk, fetchProducts]);
 
   const bySlug = useMemo(() => new Map(products.map((p) => [p.slug, p] as const)), [products]);
+
+  useEffect(() => {
+    setPriceDrafts((prev) => {
+      const next: Record<string, string> = { ...prev };
+      for (const p of products) {
+        if (next[p.slug] === undefined) {
+          next[p.slug] = String(p.price ?? "");
+        }
+      }
+      return next;
+    });
+  }, [products]);
   const adminSearchLower = adminQuery.trim().toLowerCase();
   const adminSearchResults = useMemo(() => {
     if (!adminSearchLower) return [];
@@ -202,8 +216,36 @@ export function AdminPricingClient() {
     }
     setProducts([]);
     setQuoteLines([]);
+    setPriceDrafts({});
+    setSavingSlug(null);
     setGateOk(false);
     toast.message("تم الخروج.");
+  };
+
+  const saveProductPrice = async (slug: string) => {
+    if (savingSlug) return;
+    setSavingSlug(slug);
+    try {
+      const draft = (priceDrafts[slug] ?? "").trim();
+      const res = await fetch("/api/admin/pricing/product-price", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ slug, price: draft }),
+      });
+      const json = (await res.json()) as { success?: boolean; error?: string; data?: Product };
+      if (!res.ok || !json.success || !json.data) {
+        toast.error(json.error || "تعذر حفظ السعر.");
+        return;
+      }
+      setProducts((prev) => prev.map((p) => (p.slug === slug ? json.data! : p)));
+      setPriceDrafts((prev) => ({ ...prev, [slug]: String(json.data!.price ?? "") }));
+      toast.success("تم حفظ السعر.");
+    } catch {
+      toast.error("حدث خطأ أثناء حفظ السعر.");
+    } finally {
+      setSavingSlug(null);
+    }
   };
 
   if (gateOk === null) {
@@ -414,8 +456,9 @@ export function AdminPricingClient() {
                           <th className="p-3 w-10">#</th>
                           <th className="p-3">الهدية</th>
                           <th className="p-3 w-24">SKU</th>
-                          <th className="p-3 w-28">السعر</th>
-                          <th className="p-3 w-20">إضافة</th>
+                          <th className="p-3 min-w-[220px]">السعر</th>
+                          <th className="p-3 w-28">حفظ</th>
+                          <th className="p-3 w-28">إضافة</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -427,7 +470,26 @@ export function AdminPricingClient() {
                               <td className="p-3">{i + 1}</td>
                               <td className="p-3 font-medium">{p.name}</td>
                               <td className="p-3">{p.sku}</td>
-                              <td className="p-3">{p.price ?? "—"}</td>
+                              <td className="p-3">
+                                <Input
+                                  value={priceDrafts[p.slug] ?? ""}
+                                  onChange={(e) => setPriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
+                                  placeholder="مثال: 25000 ل.س"
+                                  className="min-h-[44px]"
+                                />
+                              </td>
+                              <td className="p-3">
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  className="min-h-[44px] w-full"
+                                  onClick={() => void saveProductPrice(p.slug)}
+                                  disabled={savingSlug === p.slug || loadingProducts}
+                                >
+                                  {savingSlug === p.slug ? "جاري الحفظ..." : "حفظ"}
+                                </Button>
+                              </td>
                               <td className="p-3">
                                 <Button
                                   type="button"
