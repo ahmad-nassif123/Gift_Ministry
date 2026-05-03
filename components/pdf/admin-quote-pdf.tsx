@@ -265,7 +265,7 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>قسم الإنتاج الفني — تم إنشاء المستند آلياً من لوحة الإدارة</Text>
+          <Text style={styles.footerText}>قسم الانتاج الفني — تم إنشاء المستند آلياً من لوحة الإدارة</Text>
         </View>
       </Page>
     </Document>
