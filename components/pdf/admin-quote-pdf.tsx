@@ -39,6 +39,40 @@ const styles = StyleSheet.create({
     padding: 24,
     direction: "rtl",
     backgroundColor: COLORS.white,
+    position: "relative",
+  },
+  /** طبقة micro-text خلف المحتوى (شفافة). */
+  securityMicroLayer: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    right: 6,
+    bottom: 6,
+    opacity: 0.055,
+  },
+  securityMicroText: {
+    fontFamily: "Tajawal",
+    fontSize: 5,
+    lineHeight: 1.15,
+    color: COLORS.primary,
+    textAlign: "right",
+  },
+  /** علامة مائية مائلة: قسم الإنتاج + رقم الفاتورة */
+  securityWatermarkWrap: {
+    position: "absolute",
+    top: "32%",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.09,
+  },
+  securityWatermarkText: {
+    fontFamily: "Tajawal",
+    fontSize: 26,
+    fontWeight: 700,
+    color: COLORS.primary,
+    transform: "rotate(-28deg)",
   },
   /** ترويسة المستند */
   letterhead: {
@@ -279,9 +313,21 @@ export function AdminQuotePDF({
   const figuresAmountSyp = `${formatArabicIndicInt(Math.floor(n))} ل.س`;
   const figuresAmountUsd = `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
+  const microFrag =
+    "قسم الانتاج الفني . أصل صادر من النظام . غير صالح للتعديل اليدوي . ";
+  const securityMicroBody = Array.from({ length: 14 }, () => microFrag.repeat(4)).join("\n");
+  const watermarkPhrase = `قسم الانتاج الفني   ${(meta.invoiceNo || "—").trim()}`;
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        <View style={styles.securityMicroLayer} fixed>
+          <Text style={styles.securityMicroText}>{securityMicroBody}</Text>
+        </View>
+        <View style={styles.securityWatermarkWrap} fixed>
+          <Text style={styles.securityWatermarkText}>{watermarkPhrase}</Text>
+        </View>
+
         <Text style={styles.letterhead}>قسم الانتاج الفني</Text>
 
         <View style={styles.metaBlock}>
