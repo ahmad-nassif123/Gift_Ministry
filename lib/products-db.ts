@@ -206,11 +206,14 @@ export async function createProduct(p: Product): Promise<Product> {
   return p;
 }
 
+/** يتضمّن `price: null` لمسح السعر في القاعدة (لا يُغطّى بـ COALESCE). */
+export type ProductUpdateInput = Omit<Partial<Product>, "price"> & { price?: string | null };
+
 /**
  * تحديث منتج في جولة شبكة واحدة (بدون SELECT ثم UPDATE) لتقليل زمن الحفظ على Neon/Vercel.
  * الحقول غير المرسلة (undefined) تُمرَّر كـ NULL إلى COALESCE فتُحفَظ القيمة القديمة.
  */
-export async function updateProduct(slug: string, updates: Partial<Product>): Promise<Product | null> {
+export async function updateProduct(slug: string, updates: ProductUpdateInput): Promise<Product | null> {
   await ensureProductsTable();
   const sku = updates.sku !== undefined ? updates.sku : null;
   const name = updates.name !== undefined ? updates.name : null;
@@ -221,7 +224,10 @@ export async function updateProduct(slug: string, updates: Partial<Product>): Pr
   const imagesJson = updates.images !== undefined ? JSON.stringify(updates.images ?? []) : null;
   const catalogImage = updates.catalogImage !== undefined ? updates.catalogImage : null;
   const qty = updates.availableQuantity !== undefined ? updates.availableQuantity : null;
-  const price = updates.price !== undefined ? updates.price : null;
+  const hasPriceKey = Object.prototype.hasOwnProperty.call(updates, "price");
+  const setPriceNull = hasPriceKey && updates.price === null;
+  const priceCoalesce = hasPriceKey && typeof updates.price === "string" ? updates.price : null;
+  const priceClearFlag = setPriceNull ? 1 : 0;
   const archived = updates.archived !== undefined ? updates.archived : null;
   const hidden = updates.hidden !== undefined ? updates.hidden : null;
 
@@ -235,7 +241,7 @@ export async function updateProduct(slug: string, updates: Partial<Product>): Pr
       images = COALESCE(${imagesJson}::jsonb, p.images),
       catalog_image = COALESCE(${catalogImage}, p.catalog_image),
       available_quantity = COALESCE(${qty}, p.available_quantity),
-      price = COALESCE(${price}, p.price),
+      price = CASE WHEN ${priceClearFlag} = 1 THEN NULL ELSE COALESCE(${priceCoalesce}, p.price) END,
       archived = COALESCE(${archived}, p.archived),
       hidden = COALESCE(${hidden}, p.hidden),
       updated_at = NOW()
