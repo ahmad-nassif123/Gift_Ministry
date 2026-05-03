@@ -107,7 +107,7 @@ export function grandTotalInArabicWords(amount: number, currency: "SYP" | "USD")
   if (currency === "SYP") {
     const whole = Math.floor(amount + 1e-9);
     const w = integerToArabicWords(whole);
-    return `${w} ليرة سورية (العملة الجديدة)`;
+    return `${w} ليرة سورية`;
   }
 
   const whole = Math.floor(amount);

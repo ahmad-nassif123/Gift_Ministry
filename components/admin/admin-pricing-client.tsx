@@ -242,7 +242,7 @@ export function AdminPricingClient() {
 
       const currencyNote =
         pdfCurrency === "SYP"
-          ? "الليرة السورية — العملة الجديدة"
+          ? "الليرة السورية"
           : `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA")} ل.س للدولار الواحد)`;
 
       const blob = await generateAdminQuoteBlob({
@@ -480,7 +480,7 @@ export function AdminPricingClient() {
                         checked={pdfCurrency === "SYP"}
                         onChange={() => setPdfCurrency("SYP")}
                       />
-                      الليرة السورية (الجديدة)
+                      الليرة السورية
                     </label>
                     <label className="flex cursor-pointer items-center gap-2">
                       <input
