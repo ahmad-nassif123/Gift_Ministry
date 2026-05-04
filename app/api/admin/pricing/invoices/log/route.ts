@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isPricingGateOpen } from "@/lib/admin-pricing-session";
 import { isProductsDbConfigured } from "@/lib/products-db";
-import { insertAdminPricingInvoice, type AdminPricingInvoiceLineSnapshot } from "@/lib/admin-pricing-invoices-db";
+import {
+  insertAdminPricingInvoice,
+  type AdminPricingInvoiceLineSnapshot,
+  type PaymentTerms,
+} from "@/lib/admin-pricing-invoices-db";
 
 export const dynamic = "force-dynamic";
 
@@ -44,12 +48,20 @@ export async function POST(request: NextRequest) {
     const grandNumeric = Number(body.grandNumeric);
     const grandNum = Number.isFinite(grandNumeric) ? grandNumeric : 0;
 
+    const paymentTerms: PaymentTerms =
+      String((body as { paymentTerms?: unknown }).paymentTerms ?? "")
+        .toLowerCase() === "deferred"
+        ? "deferred"
+        : "cash";
+
     const rawLines = body.lines;
     const lines: AdminPricingInvoiceLineSnapshot[] = Array.isArray(rawLines)
       ? rawLines
           .map((x) => {
             if (!x || typeof x !== "object") return null;
             const o = x as Record<string, unknown>;
+            const unitSyp =
+              o.unitSyp != null && Number.isFinite(Number(o.unitSyp)) ? Number(o.unitSyp) : undefined;
             return {
               sku: String(o.sku ?? "—").slice(0, 128),
               name: String(o.name ?? "").slice(0, 512),
@@ -57,6 +69,7 @@ export async function POST(request: NextRequest) {
               unitPriceText: String(o.unitPriceText ?? "").slice(0, 128),
               lineValueText: String(o.lineValueText ?? "").slice(0, 128),
               custom: Boolean(o.custom),
+              ...(unitSyp !== undefined ? { unitSyp } : {}),
             };
           })
           .filter(Boolean) as AdminPricingInvoiceLineSnapshot[]
@@ -76,6 +89,7 @@ export async function POST(request: NextRequest) {
       grandTotalText,
       grandNumeric: grandNum,
       lines,
+      paymentTerms,
     });
 
     if (!row) {

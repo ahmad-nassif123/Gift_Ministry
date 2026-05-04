@@ -2,7 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Calculator, Download, FileText, History, LogOut, Plus, Search, X } from "lucide-react";
+import {
+  Calculator,
+  Copy,
+  Download,
+  Eye,
+  FileText,
+  History,
+  LogOut,
+  Pencil,
+  Plus,
+  Printer,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -10,7 +24,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Product } from "@/data/products";
+import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
 import { cn } from "@/lib/utils";
 
 const INVOICE_LS_KEY = "admin_pricing_invoice_log_v1";
@@ -19,17 +35,33 @@ type QuoteProductLine = { kind: "product"; slug: string; qty: number };
 type QuoteCustomLine = { kind: "custom"; id: string; name: string; unitPriceInput: string; qty: number };
 type QuoteLine = QuoteProductLine | QuoteCustomLine;
 
+type PaymentTerms = "cash" | "deferred";
+
+type InvoiceLineSnap = {
+  sku: string;
+  name: string;
+  qty: number;
+  unitPriceText: string;
+  lineValueText: string;
+  custom?: boolean;
+  unitSyp?: number;
+};
+
 type InvoiceHistoryRow = {
   id: string;
+  serverId?: number;
   createdAt: string;
   invoiceNo: string;
   documentDateIso: string;
   toSir: string;
   statement: string;
-  currency: string;
+  currency: "SYP" | "USD";
+  usdRate: string | null;
   grandTotalText: string;
   grandNumeric: number;
   linesCount: number;
+  lines: InvoiceLineSnap[];
+  paymentTerms: PaymentTerms;
   fromDb: boolean;
 };
 
@@ -38,45 +70,80 @@ function newCustomLineId(): string {
   return `m-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function normalizePaymentTerms(raw: unknown): PaymentTerms {
+  return String(raw ?? "").toLowerCase() === "deferred" ? "deferred" : "cash";
+}
+
+function parseStoredInvoice(o: Record<string, unknown>): InvoiceHistoryRow | null {
+  const id = String(o.id ?? "");
+  const createdAt = String(o.createdAt ?? "");
+  if (!id || !createdAt) return null;
+  const linesRaw = o.lines;
+  const lines: InvoiceLineSnap[] = Array.isArray(linesRaw)
+    ? (linesRaw as InvoiceLineSnap[]).map((ln) => ({
+        sku: String(ln.sku ?? "—"),
+        name: String(ln.name ?? ""),
+        qty: Math.max(0, Math.floor(Number(ln.qty) || 0)),
+        unitPriceText: String(ln.unitPriceText ?? ""),
+        lineValueText: String(ln.lineValueText ?? ""),
+        custom: Boolean(ln.custom),
+        unitSyp: ln.unitSyp != null && Number.isFinite(Number(ln.unitSyp)) ? Number(ln.unitSyp) : undefined,
+      }))
+    : [];
+  const cur = String(o.currency ?? "SYP").toUpperCase() === "USD" ? "USD" : "SYP";
+  return {
+    id,
+    serverId: o.serverId != null ? Number(o.serverId) : undefined,
+    createdAt,
+    invoiceNo: String(o.invoiceNo ?? ""),
+    documentDateIso: String(o.documentDateIso ?? ""),
+    toSir: String(o.toSir ?? ""),
+    statement: String(o.statement ?? ""),
+    currency: cur,
+    usdRate: o.usdRate != null && String(o.usdRate).trim() !== "" ? String(o.usdRate) : null,
+    grandTotalText: String(o.grandTotalText ?? ""),
+    grandNumeric: Number(o.grandNumeric) || 0,
+    linesCount: lines.length || Math.max(0, Math.floor(Number(o.linesCount) || 0)),
+    lines,
+    paymentTerms: normalizePaymentTerms(o.paymentTerms),
+    fromDb: false,
+  };
+}
+
 function readLocalInvoiceHistory(): InvoiceHistoryRow[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(INVOICE_LS_KEY);
     const a = raw ? (JSON.parse(raw) as unknown) : [];
     if (!Array.isArray(a)) return [];
-    return a
-      .map((x) => {
-        if (!x || typeof x !== "object") return null;
-        const o = x as Record<string, unknown>;
-        return {
-          id: String(o.id ?? ""),
-          createdAt: String(o.createdAt ?? ""),
-          invoiceNo: String(o.invoiceNo ?? ""),
-          documentDateIso: String(o.documentDateIso ?? ""),
-          toSir: String(o.toSir ?? ""),
-          statement: String(o.statement ?? ""),
-          currency: String(o.currency ?? "SYP"),
-          grandTotalText: String(o.grandTotalText ?? ""),
-          grandNumeric: Number(o.grandNumeric) || 0,
-          linesCount: Math.max(0, Math.floor(Number(o.linesCount) || 0)),
-          fromDb: false,
-        } as InvoiceHistoryRow;
-      })
-      .filter((r): r is InvoiceHistoryRow => Boolean(r?.id && r?.createdAt));
+    return a.map((x) => (x && typeof x === "object" ? parseStoredInvoice(x as Record<string, unknown>) : null)).filter((r): r is InvoiceHistoryRow => r != null);
   } catch {
     return [];
   }
 }
 
-function appendLocalInvoiceHistory(row: InvoiceHistoryRow): void {
+function writeLocalInvoiceHistory(rows: InvoiceHistoryRow[]): void {
   if (typeof window === "undefined") return;
   try {
-    const prev = readLocalInvoiceHistory();
-    const next = [row, ...prev].slice(0, 120);
-    window.localStorage.setItem(INVOICE_LS_KEY, JSON.stringify(next));
+    window.localStorage.setItem(INVOICE_LS_KEY, JSON.stringify(rows.slice(0, 120)));
   } catch {
     //
   }
+}
+
+function appendLocalInvoiceHistory(row: InvoiceHistoryRow): void {
+  const prev = readLocalInvoiceHistory();
+  writeLocalInvoiceHistory([row, ...prev.filter((x) => x.id !== row.id)]);
+}
+
+function upsertLocalInvoiceHistory(row: InvoiceHistoryRow): void {
+  const prev = readLocalInvoiceHistory();
+  writeLocalInvoiceHistory([row, ...prev.filter((x) => x.id !== row.id)]);
+}
+
+function removeLocalInvoice(id: string): void {
+  const prev = readLocalInvoiceHistory();
+  writeLocalInvoiceHistory(prev.filter((x) => x.id !== id));
 }
 
 function parsePriceNumber(raw: unknown): number {
@@ -130,6 +197,10 @@ export function AdminPricingClient() {
   const [customQtyDraft, setCustomQtyDraft] = useState("1");
   const [invoiceHistory, setInvoiceHistory] = useState<InvoiceHistoryRow[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>("cash");
+  const [editingServerId, setEditingServerId] = useState<number | null>(null);
+  const [editingLocalId, setEditingLocalId] = useState<string | null>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<InvoiceHistoryRow | null>(null);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [savingSlug, setSavingSlug] = useState<string | null>(null);
 
@@ -184,17 +255,34 @@ export function AdminPricingClient() {
           if (!raw || typeof raw !== "object") return [];
           const o = raw as Record<string, unknown>;
           const lineArr = Array.isArray(o.lines) ? o.lines : [];
+          const lines: InvoiceLineSnap[] = lineArr.map((ln) => {
+            const x = ln as Record<string, unknown>;
+            return {
+              sku: String(x.sku ?? "—"),
+              name: String(x.name ?? ""),
+              qty: Math.max(0, Math.floor(Number(x.qty) || 0)),
+              unitPriceText: String(x.unitPriceText ?? ""),
+              lineValueText: String(x.lineValueText ?? ""),
+              custom: Boolean(x.custom),
+              unitSyp: x.unitSyp != null && Number.isFinite(Number(x.unitSyp)) ? Number(x.unitSyp) : undefined,
+            };
+          });
+          const cur = String(o.currency ?? "SYP").toUpperCase() === "USD" ? "USD" : "SYP";
           const row: InvoiceHistoryRow = {
             id: `srv-${o.id}`,
+            serverId: Number(o.id),
             createdAt: String(o.createdAt ?? ""),
             invoiceNo: String(o.invoiceNo ?? ""),
             documentDateIso: o.documentDateIso != null ? String(o.documentDateIso) : "",
             toSir: String(o.toSir ?? ""),
             statement: String(o.statement ?? ""),
-            currency: String(o.currency ?? "SYP"),
+            currency: cur,
+            usdRate: o.usdRate != null && String(o.usdRate).trim() !== "" ? String(o.usdRate) : null,
             grandTotalText: String(o.grandTotalText ?? ""),
             grandNumeric: Number(o.grandNumeric) || 0,
-            linesCount: lineArr.length,
+            linesCount: lines.length,
+            lines,
+            paymentTerms: normalizePaymentTerms(o.paymentTerms),
             fromDb: true,
           };
           return [row];
@@ -384,24 +472,17 @@ export function AdminPricingClient() {
         lineValueText: string;
       };
       const pdfLines: PdfLine[] = [];
-      type Snap = {
-        sku: string;
-        name: string;
-        qty: number;
-        unitPriceText: string;
-        lineValueText: string;
-        custom?: boolean;
-      };
-      const lineSnapshots: Snap[] = [];
+      const lineSnapshots: InvoiceLineSnap[] = [];
       let running = 0;
 
       for (const l of quoteComputed.lines) {
         const qty = Math.max(0, Math.floor(l.qty));
-        const unitSyp = l.unitNum;
+        const unitSypVal = l.unitNum;
         const unitLabel = "قطعة";
+        const unitSypFloor = Math.max(0, Math.floor(unitSypVal));
 
         if (pdfCurrency === "SYP") {
-          const unitP = Math.floor(unitSyp);
+          const unitP = Math.floor(unitSypVal);
           const lineVal = unitP * qty;
           running += lineVal;
           const sypNum = (v: number) => v.toLocaleString("ar-SA", { numberingSystem: "arab" });
@@ -422,15 +503,16 @@ export function AdminPricingClient() {
             unitPriceText,
             lineValueText,
             custom: l.lineKind === "custom",
+            unitSyp: unitSypFloor,
           });
         } else {
-          const unitUsd = unitSyp > 0 ? round2(unitSyp / rate) : 0;
-          const lineVal = unitSyp > 0 ? round2((unitSyp * qty) / rate) : 0;
+          const unitUsd = unitSypVal > 0 ? round2(unitSypVal / rate) : 0;
+          const lineVal = unitSypVal > 0 ? round2((unitSypVal * qty) / rate) : 0;
           running = round2(running + lineVal);
           const unitPriceText =
-            unitSyp > 0 ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—";
+            unitSypVal > 0 ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—";
           const lineValueText =
-            unitSyp > 0 ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—";
+            unitSypVal > 0 ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—";
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
@@ -446,6 +528,7 @@ export function AdminPricingClient() {
             unitPriceText,
             lineValueText,
             custom: l.lineKind === "custom",
+            unitSyp: unitSypFloor,
           });
         }
       }
@@ -460,6 +543,8 @@ export function AdminPricingClient() {
           ? "الليرة السورية"
           : `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`;
 
+      const paymentLabel = paymentTerms === "deferred" ? "مؤجل" : "نقدي";
+
       const blob = await generateAdminQuoteBlob({
         meta: {
           toSir: toSir.trim(),
@@ -467,6 +552,7 @@ export function AdminPricingClient() {
           invoiceNo: invoiceNo.trim(),
           documentDateStr: formatInvoiceDateAr(invoiceDate),
           currencyNote,
+          paymentLabel,
         },
         lines: pdfLines,
         grandTotalText,
@@ -481,24 +567,72 @@ export function AdminPricingClient() {
       a.click();
       URL.revokeObjectURL(url);
 
+      const grandNum = pdfCurrency === "SYP" ? Math.floor(running) : running;
+      const rowId = editingLocalId ?? newCustomLineId();
       const logRow: InvoiceHistoryRow = {
-        id: newCustomLineId(),
+        id: rowId,
         createdAt: new Date().toISOString(),
         invoiceNo: invoiceNo.trim(),
         documentDateIso: invoiceDate,
         toSir: toSir.trim(),
         statement: statement.trim(),
         currency: pdfCurrency,
+        usdRate: pdfCurrency === "USD" ? String(usdRate).trim() : null,
         grandTotalText,
-        grandNumeric: pdfCurrency === "SYP" ? Math.floor(running) : running,
+        grandNumeric: grandNum,
         linesCount: lineSnapshots.length,
+        lines: lineSnapshots,
+        paymentTerms,
         fromDb: false,
       };
 
       const pushLocalLog = () => {
         appendLocalInvoiceHistory(logRow);
-        setInvoiceHistory((h) => [logRow, ...h].slice(0, 120));
+        setInvoiceHistory((h) => [logRow, ...h.filter((x) => x.id !== logRow.id)].slice(0, 120));
       };
+
+      if (editingServerId != null) {
+        try {
+          const patchRes = await fetch(`/api/admin/pricing/invoices/${editingServerId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              invoiceNo: invoiceNo.trim(),
+              documentDateIso: invoiceDate,
+              toSir: toSir.trim(),
+              statement: statement.trim(),
+              currency: pdfCurrency,
+              usdRate: pdfCurrency === "USD" ? String(usdRate).trim() : null,
+              grandTotalText,
+              grandNumeric: grandNum,
+              lines: lineSnapshots,
+              paymentTerms,
+            }),
+          });
+          const pj = (await patchRes.json()) as { success?: boolean };
+          if (patchRes.ok && pj.success) {
+            toast.success("تم تحديث الفاتورة في السجل.");
+            setEditingServerId(null);
+            setEditingLocalId(null);
+            await loadInvoices();
+            return;
+          }
+          toast.error("تعذر تحديث السجل في القاعدة.");
+        } catch {
+          toast.error("تعذر تحديث السجل.");
+        }
+        return;
+      }
+
+      if (editingLocalId != null) {
+        upsertLocalInvoiceHistory(logRow);
+        setInvoiceHistory((h) => [logRow, ...h.filter((x) => x.id !== editingLocalId)].slice(0, 120));
+        setEditingLocalId(null);
+        setEditingServerId(null);
+        toast.success("تم تحديث الفاتورة في السجل المحلي.");
+        return;
+      }
 
       try {
         const logRes = await fetch("/api/admin/pricing/invoices/log", {
@@ -513,8 +647,9 @@ export function AdminPricingClient() {
             currency: pdfCurrency,
             usdRate: pdfCurrency === "USD" ? String(usdRate).trim() : null,
             grandTotalText,
-            grandNumeric: pdfCurrency === "SYP" ? Math.floor(running) : running,
+            grandNumeric: grandNum,
             lines: lineSnapshots,
+            paymentTerms,
           }),
         });
         const lj = (await logRes.json()) as { success?: boolean; stored?: boolean };
@@ -562,6 +697,193 @@ export function AdminPricingClient() {
       });
   };
 
+  const applyInvoiceToForm = (row: InvoiceHistoryRow, mode: "edit" | "reuse") => {
+    setInvoiceNo(row.invoiceNo);
+    setInvoiceDate(row.documentDateIso ? row.documentDateIso.slice(0, 10) : new Date().toISOString().slice(0, 10));
+    setToSir(row.toSir);
+    setStatement(row.statement);
+    setPdfCurrency(row.currency);
+    if (row.usdRate) setUsdRate(row.usdRate);
+    setPaymentTerms(row.paymentTerms);
+    const seeds = snapshotSeedsToQuote(row.lines, products);
+    const nextLines: QuoteLine[] = [];
+    for (const s of seeds) {
+      if (s.kind === "product") {
+        nextLines.push({ kind: "product", slug: s.slug, qty: s.qty });
+      } else {
+        nextLines.push({
+          kind: "custom",
+          id: newCustomLineId(),
+          name: s.name,
+          unitPriceInput: s.unitPriceInput,
+          qty: s.qty,
+        });
+      }
+    }
+    setQuoteLines(nextLines);
+    if (mode === "edit") {
+      if (row.fromDb && row.serverId != null) {
+        setEditingServerId(row.serverId);
+        setEditingLocalId(null);
+      } else {
+        setEditingLocalId(row.id);
+        setEditingServerId(null);
+      }
+    } else {
+      setEditingServerId(null);
+      setEditingLocalId(null);
+    }
+    toast.message(
+      mode === "edit"
+        ? "تم تحميل الفاتورة للتعديل — عدّل ثم «تحميل PDF» لحفظ التغييرات في السجل."
+        : "تم تحميل البيانات للاستخدام — يمكنك تغيير رقم الفاتورة ثم الطباعة كنسخة جديدة."
+    );
+  };
+
+  const reprintInvoicePdf = async (row: InvoiceHistoryRow) => {
+    if (row.lines.length === 0) {
+      toast.error("لا توجد بنود في هذه الفاتورة.");
+      return;
+    }
+    try {
+      const { generateAdminQuoteBlob } = await import("@/lib/admin-quote-pdf");
+      const rate = row.usdRate != null ? Number(String(row.usdRate).replace(/[^\d.]/g, "")) : 0;
+      const currencyNote =
+        row.currency === "USD" && Number.isFinite(rate) && rate > 0
+          ? `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`
+          : "الليرة السورية";
+      const pdfLines = row.lines.map((l) => ({
+        sku: l.sku,
+        name: l.name,
+        qty: l.qty,
+        unit: "قطعة",
+        unitPriceText: l.unitPriceText,
+        lineValueText: l.lineValueText,
+      }));
+      const blob = await generateAdminQuoteBlob({
+        meta: {
+          toSir: row.toSir,
+          statement: row.statement,
+          invoiceNo: row.invoiceNo,
+          documentDateStr: formatInvoiceDateAr(row.documentDateIso),
+          currencyNote,
+          paymentLabel: row.paymentTerms === "deferred" ? "مؤجل" : "نقدي",
+        },
+        lines: pdfLines,
+        grandTotalText: row.grandTotalText,
+        grandNumericForWords: row.currency === "SYP" ? Math.floor(row.grandNumeric) : row.grandNumeric,
+        currency: row.currency,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeInv = row.invoiceNo.replace(/[^\w\u0600-\u06FF-]+/g, "_").slice(0, 40);
+      a.download = `فاتورة-${safeInv || "نسخة"}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("تم إعداد ملف PDF.");
+    } catch (e) {
+      console.error(e);
+      toast.error("تعذر طباعة الفاتورة.");
+    }
+  };
+
+  const deleteInvoiceFromLog = async (row: InvoiceHistoryRow) => {
+    if (!window.confirm("حذف هذه الفاتورة من السجل؟")) return;
+    if (row.fromDb && row.serverId != null) {
+      try {
+        const res = await fetch(`/api/admin/pricing/invoices/${row.serverId}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        const j = (await res.json()) as { success?: boolean };
+        if (res.ok && j.success) {
+          toast.success("تم الحذف من القاعدة.");
+          if (previewInvoice?.id === row.id) setPreviewInvoice(null);
+          await loadInvoices();
+          return;
+        }
+        toast.error("تعذر الحذف.");
+      } catch {
+        toast.error("تعذر الحذف.");
+      }
+      return;
+    }
+    removeLocalInvoice(row.id);
+    setInvoiceHistory((h) => h.filter((x) => x.id !== row.id));
+    if (previewInvoice?.id === row.id) setPreviewInvoice(null);
+    toast.success("تم الحذف من السجل المحلي.");
+  };
+
+  const downloadInvoiceFinancialReport = () => {
+    if (invoiceHistory.length === 0) {
+      toast.message("لا توجد فواتير في السجل المعروض.");
+      return;
+    }
+    void import("xlsx")
+      .then((XLSX) => {
+        const list = invoiceHistory;
+        let sypCash = 0;
+        let sypDef = 0;
+        let usdCash = 0;
+        let usdDef = 0;
+        let nCash = 0;
+        let nDef = 0;
+        for (const inv of list) {
+          const g = inv.grandNumeric;
+          if (inv.paymentTerms === "deferred") nDef += 1;
+          else nCash += 1;
+          if (inv.currency === "SYP") {
+            if (inv.paymentTerms === "deferred") sypDef += Math.floor(g);
+            else sypCash += Math.floor(g);
+          } else {
+            if (inv.paymentTerms === "deferred") usdDef += g;
+            else usdCash += g;
+          }
+        }
+        const sypAll = sypCash + sypDef;
+        const usdAll = usdCash + usdDef;
+        const summaryRows = [
+          { البند: "ملخص مالي — بناءً على السجل الظاهر فقط", القيمة: "" },
+          { البند: "تاريخ إنشاء التقرير", القيمة: new Date().toLocaleString("ar-SY") },
+          { البند: "عدد الفواتير في التقرير", القيمة: list.length },
+          { البند: "—", القيمة: "—" },
+          { البند: "إجمالي الليرة السورية — نقدي", القيمة: sypCash },
+          { البند: "إجمالي الليرة السورية — مؤجل", القيمة: sypDef },
+          { البند: "مجموع الليرة السورية (نقدي + مؤجل)", القيمة: sypAll },
+          { البند: "—", القيمة: "—" },
+          { البند: "إجمالي الدولار — نقدي", القيمة: Number(usdCash.toFixed(4)) },
+          { البند: "إجمالي الدولار — مؤجل", القيمة: Number(usdDef.toFixed(4)) },
+          { البند: "مجموع الدولار (نقدي + مؤجل)", القيمة: Number(usdAll.toFixed(4)) },
+          { البند: "—", القيمة: "—" },
+          { البند: "عدد فواتير نقدي", القيمة: nCash },
+          { البند: "عدد فواتير مؤجل", القيمة: nDef },
+          {
+            البند: "ملاحظة",
+            القيمة: "لا يُجمَع الدولار مع الليرة في صف واحد دون سعر تحويل — راجع عمود العملة في التفصيل.",
+          },
+        ];
+        const detailRows = list.map((inv, i) => ({
+          التسلسل: i + 1,
+          التاريخ: new Date(inv.createdAt).toLocaleString("ar-SY"),
+          "رقم الفاتورة": inv.invoiceNo,
+          "إلى السيد": inv.toSir,
+          العملة: inv.currency,
+          "السداد": inv.paymentTerms === "deferred" ? "مؤجل" : "نقدي",
+          المجموع_النص: inv.grandTotalText,
+          المجموع_رقمي: inv.grandNumeric,
+          البنود: inv.lines.length,
+          المصدر: inv.fromDb ? "قاعدة" : "محلي",
+        }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "ملخص");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), "تفصيل");
+        XLSX.writeFile(wb, `تقرير-مالي-فواتير-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        toast.success("تم تنزيل التقرير.");
+      })
+      .catch(() => toast.error("تعذر إنشاء التقرير."));
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loggingIn) return;
@@ -602,6 +924,10 @@ export function AdminPricingClient() {
     setCustomPriceDraft("");
     setCustomQtyDraft("1");
     setInvoiceHistory([]);
+    setPaymentTerms("cash");
+    setEditingServerId(null);
+    setEditingLocalId(null);
+    setPreviewInvoice(null);
     setToSir("");
     setStatement("");
     setPdfCurrency("SYP");
@@ -729,9 +1055,22 @@ export function AdminPricingClient() {
                 <History className="h-5 w-5 shrink-0" />
                 سجل الفواتير الصادرة
               </CardTitle>
-              <Button type="button" variant="outline" size="sm" className="min-h-[44px]" onClick={() => void loadInvoices()} disabled={loadingInvoices}>
-                {loadingInvoices ? "جاري التحميل..." : "تحديث السجل"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="min-h-[44px]"
+                  onClick={() => downloadInvoiceFinancialReport()}
+                  disabled={invoiceHistory.length === 0}
+                >
+                  <Download className="ml-2 h-4 w-4" />
+                  تقرير مالي (Excel)
+                </Button>
+                <Button type="button" variant="outline" size="sm" className="min-h-[44px]" onClick={() => void loadInvoices()} disabled={loadingInvoices}>
+                  {loadingInvoices ? "جاري التحميل..." : "تحديث السجل"}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {invoiceHistory.length === 0 ? (
@@ -740,22 +1079,24 @@ export function AdminPricingClient() {
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
-                  <table className="w-full min-w-[640px] text-right text-sm">
+                  <table className="w-full min-w-[880px] text-right text-sm">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="p-3">التاريخ</th>
-                        <th className="p-3">رقم الفاتورة</th>
-                        <th className="p-3">إلى السيد</th>
-                        <th className="p-3">المجموع</th>
-                        <th className="p-3 w-20">العملة</th>
-                        <th className="p-3 w-16">البنود</th>
-                        <th className="p-3 w-24">المصدر</th>
+                        <th className="p-2">التاريخ</th>
+                        <th className="p-2">الرقم</th>
+                        <th className="p-2 max-w-[120px]">إلى السيد</th>
+                        <th className="p-2">المجموع</th>
+                        <th className="p-2 w-14">عملة</th>
+                        <th className="p-2 w-20">السداد</th>
+                        <th className="p-2 w-12">بنود</th>
+                        <th className="p-2 w-14">مصدر</th>
+                        <th className="p-2 text-center min-w-[200px]">إجراءات</th>
                       </tr>
                     </thead>
                     <tbody>
                       {invoiceHistory.map((row) => (
                         <tr key={row.id} className="border-t align-middle">
-                          <td className="p-3 whitespace-nowrap text-xs tabular-nums sm:text-sm">
+                          <td className="p-2 whitespace-nowrap text-xs tabular-nums">
                             {(() => {
                               try {
                                 return new Date(row.createdAt).toLocaleString("ar-SY");
@@ -764,14 +1105,69 @@ export function AdminPricingClient() {
                               }
                             })()}
                           </td>
-                          <td className="p-3 font-medium">{row.invoiceNo || "—"}</td>
-                          <td className="p-3 max-w-[160px] truncate" title={row.toSir || undefined}>
+                          <td className="p-2 font-medium">{row.invoiceNo || "—"}</td>
+                          <td className="p-2 max-w-[120px] truncate text-xs" title={row.toSir || undefined}>
                             {row.toSir || "—"}
                           </td>
-                          <td className="p-3 tabular-nums">{row.grandTotalText || "—"}</td>
-                          <td className="p-3">{row.currency === "USD" ? "USD" : "ل.س"}</td>
-                          <td className="p-3 text-center tabular-nums">{row.linesCount}</td>
-                          <td className="p-3 text-muted-foreground text-xs">{row.fromDb ? "قاعدة" : "محلي"}</td>
+                          <td className="p-2 tabular-nums text-xs">{row.grandTotalText || "—"}</td>
+                          <td className="p-2">{row.currency === "USD" ? "USD" : "ل.س"}</td>
+                          <td className="p-2 text-xs">{row.paymentTerms === "deferred" ? "مؤجل" : "نقدي"}</td>
+                          <td className="p-2 text-center tabular-nums">{row.lines.length || row.linesCount}</td>
+                          <td className="p-2 text-muted-foreground text-xs">{row.fromDb ? "قاعدة" : "محلي"}</td>
+                          <td className="p-2">
+                            <div className="flex flex-wrap items-center justify-center gap-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9 px-2"
+                                onClick={() => setPreviewInvoice(row)}
+                                title="معاينة"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9 px-2"
+                                onClick={() => applyInvoiceToForm(row, "edit")}
+                                title="تعديل"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9 px-2"
+                                onClick={() => applyInvoiceToForm(row, "reuse")}
+                                title="إعادة استخدام"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9 px-2"
+                                onClick={() => void reprintInvoicePdf(row)}
+                                title="طباعة"
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="h-9 px-2"
+                                onClick={() => void deleteInvoiceFromLog(row)}
+                                title="حذف"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -792,6 +1188,22 @@ export function AdminPricingClient() {
               <p className="text-sm text-muted-foreground">
                 ابحث عن هدية وأضفها للحساب، ثم حدّد الكمية لتحصل على الإجمالي ويمكنك تحميل PDF.
               </p>
+
+              {(editingServerId != null || editingLocalId != null) && (
+                <div className="rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  يتم الآن تعديل فاتورة مسجّلة — بعد التعديل اضغط «تحميل PDF» لتحديث السجل.{" "}
+                  <button
+                    type="button"
+                    className="font-medium underline underline-offset-2"
+                    onClick={() => {
+                      setEditingServerId(null);
+                      setEditingLocalId(null);
+                    }}
+                  >
+                    إلغاء وضع التعديل
+                  </button>
+                </div>
+              )}
 
               <div className="rounded-lg border bg-card p-4 space-y-4">
                 <p className="text-sm font-semibold">بيانات الفاتورة (PDF)</p>
@@ -869,6 +1281,31 @@ export function AdminPricingClient() {
                       />
                     </div>
                   )}
+                </div>
+                <div className="space-y-2 border-t pt-3">
+                  <p className="text-sm text-muted-foreground">طريقة السداد (تظهر في PDF وسجل الفواتير)</p>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="payment-terms"
+                        className="h-4 w-4"
+                        checked={paymentTerms === "cash"}
+                        onChange={() => setPaymentTerms("cash")}
+                      />
+                      نقدي
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="payment-terms"
+                        className="h-4 w-4"
+                        checked={paymentTerms === "deferred"}
+                        onChange={() => setPaymentTerms("deferred")}
+                      />
+                      مؤجل
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -1150,6 +1587,75 @@ export function AdminPricingClient() {
           </Card>
         </div>
       </main>
+
+      <Dialog open={previewInvoice != null} onOpenChange={(open) => !open && setPreviewInvoice(null)}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>معاينة الفاتورة {previewInvoice?.invoiceNo ?? ""}</DialogTitle>
+          </DialogHeader>
+          {previewInvoice && (
+            <div className="space-y-4 text-sm">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <span className="text-muted-foreground">التاريخ </span>
+                  {new Date(previewInvoice.createdAt).toLocaleString("ar-SY")}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">العملة </span>
+                  {previewInvoice.currency === "USD" ? "USD" : "ل.س"}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">السداد </span>
+                  {previewInvoice.paymentTerms === "deferred" ? "مؤجل" : "نقدي"}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">المجموع </span>
+                  <span className="font-semibold tabular-nums">{previewInvoice.grandTotalText}</span>
+                </div>
+                {previewInvoice.usdRate && (
+                  <div className="sm:col-span-2">
+                    <span className="text-muted-foreground">سعر الصرف </span>
+                    {previewInvoice.usdRate}
+                  </div>
+                )}
+                <div className="sm:col-span-2">
+                  <span className="text-muted-foreground">إلى السيد </span>
+                  {previewInvoice.toSir || "—"}
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="text-muted-foreground">البيان </span>
+                  {previewInvoice.statement || "—"}
+                </div>
+              </div>
+              <div className="overflow-x-auto rounded border">
+                <table className="w-full min-w-[520px] text-right text-xs">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="p-2">SKU</th>
+                      <th className="p-2">الاسم</th>
+                      <th className="p-2">العدد</th>
+                      <th className="p-2">سعر</th>
+                      <th className="p-2">قيمة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewInvoice.lines.map((ln, i) => (
+                      <tr key={`${i}-${ln.sku}`} className="border-t">
+                        <td className="p-2">{ln.sku}</td>
+                        <td className="p-2 font-medium">{ln.name}</td>
+                        <td className="p-2 tabular-nums">{ln.qty}</td>
+                        <td className="p-2 tabular-nums">{ln.unitPriceText}</td>
+                        <td className="p-2 tabular-nums">{ln.lineValueText}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Footer />
     </div>
   );

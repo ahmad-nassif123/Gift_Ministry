@@ -287,6 +287,8 @@ export type AdminQuotePdfMeta = {
   invoiceNo: string;
   documentDateStr: string;
   currencyNote: string;
+  /** طريقة السداد (نقدي / مؤجل) — تُعرض في صندوق البيانات عند التمرير. */
+  paymentLabel?: string;
 };
 
 export function AdminQuotePDF({
@@ -341,6 +343,10 @@ export function AdminQuotePDF({
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>التاريخ</Text>
             <Text style={styles.metaValue}>{meta.documentDateStr}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>طريقة السداد</Text>
+            <Text style={styles.metaValue}>{meta.paymentLabel ?? "—"}</Text>
           </View>
           <View style={[styles.metaRow, { marginBottom: 0 }]}>
             <Text style={styles.metaLabel}>العملة</Text>
