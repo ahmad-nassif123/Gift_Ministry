@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Product } from "@/data/products";
 import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
+import { formatGiftPriceUsdLabel } from "@/lib/catalog-price-display";
 import { cn } from "@/lib/utils";
 
 const INVOICE_LS_KEY = "admin_pricing_invoice_log_v1";
@@ -1338,7 +1339,7 @@ export function AdminPricingClient() {
                                 <div className="font-medium truncate">{p.name}</div>
                                 <div className="mt-1 flex flex-wrap gap-2">
                                   <Badge variant="outline">كود: {p.sku}</Badge>
-                                  <Badge variant="outline">السعر: {normalizeSypCurrencyLabel(String(p.price ?? "")) || "—"}</Badge>
+                                  <Badge variant="outline">السعر (عرض USD): {formatGiftPriceUsdLabel(String(p.price ?? ""))}</Badge>
                                 </div>
                               </div>
                               <Button type="button" onClick={() => addQuoteLine(p.slug)} disabled={already} className="min-h-[44px] shrink-0">

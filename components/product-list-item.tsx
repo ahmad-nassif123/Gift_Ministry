@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type Product, getGiftTierLabel } from "@/data/products";
 import { BLUR_DATA_URL } from "@/lib/blur-placeholder";
+import { formatGiftPriceUsdLabel } from "@/lib/catalog-price-display";
 
 export function ProductListItem({
   product,
@@ -59,6 +60,9 @@ export function ProductListItem({
                 كود: {product.sku} · العدد: {product.availableQuantity ?? 0}
                 {isOnRecommendation ? " · على التوصية" : ""}
               </p>
+              {product.price ? (
+                <p className="mt-1 text-sm font-semibold text-brand-green-dark">{formatGiftPriceUsdLabel(product.price)}</p>
+              ) : null}
             </div>
 
             <div className="flex flex-col items-end gap-1">
