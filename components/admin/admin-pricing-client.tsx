@@ -541,8 +541,8 @@ export function AdminPricingClient() {
 
       const currencyNote =
         pdfCurrency === "SYP"
-          ? `الليرة السورية (تحويل من أسعار الكتالوج بالدولار بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`
-          : "الدولار الأمريكي — وفق أسعار الكتالوج بالدولار";
+          ? `الليرة السورية (تحويل بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`
+          : "الدولار الأمريكي";
 
       const paymentLabel = paymentTerms === "deferred" ? "مؤجل" : "نقدي";
 
@@ -755,7 +755,7 @@ export function AdminPricingClient() {
         row.currency === "USD"
           ? Number.isFinite(rate) && rate > 0
             ? `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`
-            : "الدولار الأمريكي — وفق أسعار الكتالوج بالدولار"
+            : "الدولار الأمريكي"
           : "الليرة السورية";
       const pdfLines = row.lines.map((l) => ({
         sku: l.sku,
@@ -872,7 +872,7 @@ export function AdminPricingClient() {
           التسلسل: i + 1,
           التاريخ: new Date(inv.createdAt).toLocaleString("ar-SY"),
           "رقم الفاتورة": inv.invoiceNo,
-          "إلى السيد": inv.toSir,
+          الجهة: inv.toSir,
           العملة: inv.currency,
           "السداد": inv.paymentTerms === "deferred" ? "مؤجل" : "نقدي",
           المجموع_النص: inv.grandTotalText,
@@ -1181,7 +1181,7 @@ export function AdminPricingClient() {
                       <tr>
                         <th className="p-2">التاريخ</th>
                         <th className="p-2">الرقم</th>
-                        <th className="p-2 max-w-[120px]">إلى السيد</th>
+                        <th className="p-2 max-w-[120px]">الجهة</th>
                         <th className="p-2">المجموع</th>
                         <th className="p-2 w-14">عملة</th>
                         <th className="p-2 w-20">السداد</th>
@@ -1319,7 +1319,7 @@ export function AdminPricingClient() {
                   </div>
                   <div className="sm:col-span-2">
                     <label htmlFor="inv-to" className="mb-1 block text-sm text-muted-foreground">
-                      إلى السيد
+                      الجهة
                     </label>
                     <Input id="inv-to" value={toSir} onChange={(e) => setToSir(e.target.value)} placeholder="اسم الجهة أو الشخص" className="min-h-[44px]" />
                   </div>
@@ -1366,7 +1366,7 @@ export function AdminPricingClient() {
                   {pdfCurrency === "SYP" && (
                     <div>
                       <label htmlFor="usd-rate" className="mb-1 block text-sm text-muted-foreground">
-                        سعر الصرف (ليرة سورية للدولار الواحد) — لتحويل أسعار الكتالوج من الدولار
+                        سعر الصرف (ليرة سورية للدولار الواحد) — للتحويل إلى الليرة في المستند
                       </label>
                       <Input
                         id="usd-rate"
@@ -1727,7 +1727,7 @@ export function AdminPricingClient() {
                   </div>
                 )}
                 <div className="sm:col-span-2">
-                  <span className="text-muted-foreground">إلى السيد </span>
+                  <span className="text-muted-foreground">الجهة </span>
                   {previewInvoice.toSir || "—"}
                 </div>
                 <div className="sm:col-span-2">
