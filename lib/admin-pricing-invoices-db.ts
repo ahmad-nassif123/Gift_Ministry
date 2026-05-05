@@ -12,7 +12,9 @@ export type AdminPricingInvoiceLineSnapshot = {
   unitPriceText: string;
   lineValueText: string;
   custom?: boolean;
-  /** ل.س للوحدة (للاستيراد في الحاسبة) */
+  /** USD للوحدة (كتالوج جديد) */
+  unitUsd?: number;
+  /** ل.س للوحدة — فواتير قديمة أو عند طباعة PDF بالليرة */
   unitSyp?: number;
 };
 

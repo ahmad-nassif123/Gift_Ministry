@@ -25,6 +25,8 @@ function parseLines(raw: unknown): AdminPricingInvoiceLineSnapshot[] {
       const o = x as Record<string, unknown>;
       const unitSyp =
         o.unitSyp != null && Number.isFinite(Number(o.unitSyp)) ? Number(o.unitSyp) : undefined;
+      const unitUsd =
+        o.unitUsd != null && Number.isFinite(Number(o.unitUsd)) ? Number(o.unitUsd) : undefined;
       return {
         sku: String(o.sku ?? "—").slice(0, 128),
         name: String(o.name ?? "").slice(0, 512),
@@ -32,6 +34,7 @@ function parseLines(raw: unknown): AdminPricingInvoiceLineSnapshot[] {
         unitPriceText: String(o.unitPriceText ?? "").slice(0, 128),
         lineValueText: String(o.lineValueText ?? "").slice(0, 128),
         custom: Boolean(o.custom),
+        ...(unitUsd !== undefined ? { unitUsd } : {}),
         ...(unitSyp !== undefined ? { unitSyp } : {}),
       };
     })

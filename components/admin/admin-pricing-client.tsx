@@ -10,6 +10,7 @@ import {
   FileText,
   History,
   LogOut,
+  Package,
   Pencil,
   Plus,
   Printer,
@@ -27,10 +28,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Product } from "@/data/products";
 import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
-import { formatGiftPriceUsdLabel } from "@/lib/catalog-price-display";
+import { formatGiftPriceUsdLabel, parseGiftPriceUsdAmount, roundCatalogUsd } from "@/lib/catalog-price-display";
 import { cn } from "@/lib/utils";
 
 const INVOICE_LS_KEY = "admin_pricing_invoice_log_v1";
+
+type AdminPricingTab = "gift-list" | "gift-pricing";
 
 type QuoteProductLine = { kind: "product"; slug: string; qty: number };
 type QuoteCustomLine = { kind: "custom"; id: string; name: string; unitPriceInput: string; qty: number };
@@ -45,6 +48,7 @@ type InvoiceLineSnap = {
   unitPriceText: string;
   lineValueText: string;
   custom?: boolean;
+  unitUsd?: number;
   unitSyp?: number;
 };
 
@@ -88,6 +92,7 @@ function parseStoredInvoice(o: Record<string, unknown>): InvoiceHistoryRow | nul
         unitPriceText: String(ln.unitPriceText ?? ""),
         lineValueText: String(ln.lineValueText ?? ""),
         custom: Boolean(ln.custom),
+        unitUsd: ln.unitUsd != null && Number.isFinite(Number(ln.unitUsd)) ? Number(ln.unitUsd) : undefined,
         unitSyp: ln.unitSyp != null && Number.isFinite(Number(ln.unitSyp)) ? Number(ln.unitSyp) : undefined,
       }))
     : [];
@@ -147,28 +152,9 @@ function removeLocalInvoice(id: string): void {
   writeLocalInvoiceHistory(prev.filter((x) => x.id !== id));
 }
 
-function parsePriceNumber(raw: unknown): number {
-  const s = String(raw ?? "").trim();
-  if (!s) return 0;
-  const cleaned = s.replace(/[^\d.,]/g, "").replace(/,/g, "");
-  const n = Number(cleaned);
-  if (!Number.isFinite(n) || n < 0) return 0;
-  return Math.floor(n);
-}
-
-function formatMoney(n: number): string {
-  const v = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
-  return v.toLocaleString("ar-SA");
-}
-
-/** عرض «ل.س» في واجهة الإدارة حتى لو كان السعر المخزّن يحتوي «ر.س». */
-function normalizeSypCurrencyLabel(raw: string): string {
-  return String(raw).replace(/ر\.س/g, "ل.س");
-}
-
-function round2(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.round(n * 100) / 100;
+function formatUsdCalculatorDisplay(n: number): string {
+  const v = roundCatalogUsd(Math.max(0, n));
+  return `${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 }
 
 function formatInvoiceDateAr(isoYmd: string): string {
@@ -198,6 +184,8 @@ export function AdminPricingClient() {
   const [customQtyDraft, setCustomQtyDraft] = useState("1");
   const [invoiceHistory, setInvoiceHistory] = useState<InvoiceHistoryRow[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [invoiceLogPdfLoading, setInvoiceLogPdfLoading] = useState(false);
+  const [adminTab, setAdminTab] = useState<AdminPricingTab>("gift-list");
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>("cash");
   const [editingServerId, setEditingServerId] = useState<number | null>(null);
   const [editingLocalId, setEditingLocalId] = useState<string | null>(null);
@@ -215,7 +203,7 @@ export function AdminPricingClient() {
   const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [toSir, setToSir] = useState("");
   const [statement, setStatement] = useState("");
-  const [pdfCurrency, setPdfCurrency] = useState<"SYP" | "USD">("SYP");
+  const [pdfCurrency, setPdfCurrency] = useState<"SYP" | "USD">("USD");
   const [usdRate, setUsdRate] = useState("15000");
 
   const checkGate = useCallback(async () => {
@@ -265,6 +253,7 @@ export function AdminPricingClient() {
               unitPriceText: String(x.unitPriceText ?? ""),
               lineValueText: String(x.lineValueText ?? ""),
               custom: Boolean(x.custom),
+              unitUsd: x.unitUsd != null && Number.isFinite(Number(x.unitUsd)) ? Number(x.unitUsd) : undefined,
               unitSyp: x.unitSyp != null && Number.isFinite(Number(x.unitSyp)) ? Number(x.unitSyp) : undefined,
             };
           });
@@ -318,7 +307,7 @@ export function AdminPricingClient() {
       const next: Record<string, string> = { ...prev };
       for (const p of products) {
         if (next[p.slug] === undefined) {
-          next[p.slug] = normalizeSypCurrencyLabel(String(p.price ?? ""));
+          next[p.slug] = String(p.price ?? "").trim();
         }
       }
       return next;
@@ -353,9 +342,9 @@ export function AdminPricingClient() {
       toast.error("أدخل اسم البند.");
       return;
     }
-    const unitNum = parsePriceNumber(customPriceDraft);
-    if (unitNum <= 0) {
-      toast.error("أدخل سعراً صالحاً للبند اليدوي.");
+    const unitUsd = roundCatalogUsd(parseGiftPriceUsdAmount(customPriceDraft));
+    if (unitUsd <= 0) {
+      toast.error("أدخل سعراً صالحاً بالدولار للبند اليدوي.");
       return;
     }
     const qty = Math.max(1, Math.min(999999, Math.floor(Number(customQtyDraft.replace(/[^\d]/g, "")) || 1)));
@@ -405,17 +394,20 @@ export function AdminPricingClient() {
       sku: string;
       name: string;
       unitPriceText: string;
-      unitNum: number;
+      unitUsd: number;
       qty: number;
-      totalNum: number;
+      totalUsd: number;
     };
     const lines: Computed[] = [];
     for (const l of quoteLines) {
       if (l.kind === "custom") {
         const qty = Math.max(0, Math.floor(l.qty ?? 0));
-        const unitNum = parsePriceNumber(l.unitPriceInput);
-        const totalNum = unitNum * qty;
-        const unitPriceText = normalizeSypCurrencyLabel(l.unitPriceInput.trim()) || "—";
+        const unitUsd = roundCatalogUsd(parseGiftPriceUsdAmount(l.unitPriceInput));
+        const totalUsd = roundCatalogUsd(unitUsd * qty);
+        const unitPriceText =
+          unitUsd > 0
+            ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+            : l.unitPriceInput.trim() || "—";
         lines.push({
           rowKey: l.id,
           lineKind: "custom",
@@ -423,31 +415,35 @@ export function AdminPricingClient() {
           sku: "—",
           name: l.name.trim() || "بند يدوي",
           unitPriceText,
-          unitNum,
+          unitUsd,
           qty,
-          totalNum,
+          totalUsd,
         });
         continue;
       }
       const p = bySlug.get(l.slug);
       if (!p) continue;
       const qty = Math.max(0, Math.floor(l.qty ?? 0));
-      const unitNum = parsePriceNumber(p.price);
-      const totalNum = unitNum * qty;
+      const unitUsd = roundCatalogUsd(parseGiftPriceUsdAmount(String(p.price ?? "")));
+      const totalUsd = roundCatalogUsd(unitUsd * qty);
+      const unitPriceText =
+        unitUsd > 0
+          ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+          : String(p.price ?? "").trim() || "—";
       lines.push({
         rowKey: l.slug,
         lineKind: "product",
         slug: l.slug,
         sku: p.sku,
         name: p.name,
-        unitPriceText: normalizeSypCurrencyLabel((p.price ?? "").trim()) || "—",
-        unitNum,
+        unitPriceText,
+        unitUsd,
         qty,
-        totalNum,
+        totalUsd,
       });
     }
-    const grand = lines.reduce((s, x) => s + (x.totalNum ?? 0), 0);
-    return { lines, grand };
+    const grandUsd = roundCatalogUsd(lines.reduce((s, x) => s + (x.totalUsd ?? 0), 0));
+    return { lines, grandUsd };
   }, [quoteLines, bySlug]);
 
   const downloadQuotePdf = async () => {
@@ -457,8 +453,8 @@ export function AdminPricingClient() {
       return;
     }
     const rate = Number(String(usdRate).replace(/[^\d.]/g, ""));
-    if (pdfCurrency === "USD" && (!Number.isFinite(rate) || rate <= 0)) {
-      toast.error("أدخل سعر صرف صالح (ليرة سورية للدولار الواحد) لتصدير الملف بالدولار.");
+    if (pdfCurrency === "SYP" && (!Number.isFinite(rate) || rate <= 0)) {
+      toast.error("أدخل سعر صرف صالح (ليرة سورية للدولار الواحد) لطباعة المستند بالليرة.");
       return;
     }
     setQuotePdfLoading(true);
@@ -478,12 +474,11 @@ export function AdminPricingClient() {
 
       for (const l of quoteComputed.lines) {
         const qty = Math.max(0, Math.floor(l.qty));
-        const unitSypVal = l.unitNum;
         const unitLabel = "قطعة";
-        const unitSypFloor = Math.max(0, Math.floor(unitSypVal));
+        const unitUsdVal = l.unitUsd;
 
         if (pdfCurrency === "SYP") {
-          const unitP = Math.floor(unitSypVal);
+          const unitP = Math.max(0, Math.floor(unitUsdVal * rate + 1e-9));
           const lineVal = unitP * qty;
           running += lineVal;
           const sypNum = (v: number) => v.toLocaleString("ar-SA", { numberingSystem: "arab" });
@@ -504,16 +499,21 @@ export function AdminPricingClient() {
             unitPriceText,
             lineValueText,
             custom: l.lineKind === "custom",
-            unitSyp: unitSypFloor,
+            unitUsd: unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : undefined,
+            ...(unitP > 0 ? { unitSyp: unitP } : {}),
           });
         } else {
-          const unitUsd = unitSypVal > 0 ? round2(unitSypVal / rate) : 0;
-          const lineVal = unitSypVal > 0 ? round2((unitSypVal * qty) / rate) : 0;
-          running = round2(running + lineVal);
+          const unitUsdRounded = unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : 0;
+          const lineVal = unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal * qty) : 0;
+          running = roundCatalogUsd(running + lineVal);
           const unitPriceText =
-            unitSypVal > 0 ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—";
+            unitUsdVal > 0
+              ? `${unitUsdRounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+              : "—";
           const lineValueText =
-            unitSypVal > 0 ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "—";
+            unitUsdVal > 0
+              ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+              : "—";
           pdfLines.push({
             sku: l.sku || "—",
             name: l.name,
@@ -529,7 +529,7 @@ export function AdminPricingClient() {
             unitPriceText,
             lineValueText,
             custom: l.lineKind === "custom",
-            unitSyp: unitSypFloor,
+            unitUsd: unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : undefined,
           });
         }
       }
@@ -537,12 +537,12 @@ export function AdminPricingClient() {
       const grandTotalText =
         pdfCurrency === "SYP"
           ? `${Math.floor(running).toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س`
-          : `${running.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+          : `${roundCatalogUsd(running).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
       const currencyNote =
         pdfCurrency === "SYP"
-          ? "الليرة السورية"
-          : `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`;
+          ? `الليرة السورية (تحويل من أسعار الكتالوج بالدولار بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`
+          : "الدولار الأمريكي — وفق أسعار الكتالوج بالدولار";
 
       const paymentLabel = paymentTerms === "deferred" ? "مؤجل" : "نقدي";
 
@@ -557,7 +557,7 @@ export function AdminPricingClient() {
         },
         lines: pdfLines,
         grandTotalText,
-        grandNumericForWords: pdfCurrency === "SYP" ? Math.floor(running) : running,
+        grandNumericForWords: pdfCurrency === "SYP" ? Math.floor(running) : roundCatalogUsd(running),
         currency: pdfCurrency,
       });
       const url = URL.createObjectURL(blob);
@@ -568,7 +568,7 @@ export function AdminPricingClient() {
       a.click();
       URL.revokeObjectURL(url);
 
-      const grandNum = pdfCurrency === "SYP" ? Math.floor(running) : running;
+      const grandNum = pdfCurrency === "SYP" ? Math.floor(running) : roundCatalogUsd(running);
       const rowId = editingLocalId ?? newCustomLineId();
       const logRow: InvoiceHistoryRow = {
         id: rowId,
@@ -578,7 +578,7 @@ export function AdminPricingClient() {
         toSir: toSir.trim(),
         statement: statement.trim(),
         currency: pdfCurrency,
-        usdRate: pdfCurrency === "USD" ? String(usdRate).trim() : null,
+        usdRate: pdfCurrency === "SYP" ? String(usdRate).trim() : null,
         grandTotalText,
         grandNumeric: grandNum,
         linesCount: lineSnapshots.length,
@@ -604,7 +604,7 @@ export function AdminPricingClient() {
               toSir: toSir.trim(),
               statement: statement.trim(),
               currency: pdfCurrency,
-              usdRate: pdfCurrency === "USD" ? String(usdRate).trim() : null,
+              usdRate: pdfCurrency === "SYP" ? String(usdRate).trim() : null,
               grandTotalText,
               grandNumeric: grandNum,
               lines: lineSnapshots,
@@ -646,7 +646,7 @@ export function AdminPricingClient() {
             toSir: toSir.trim(),
             statement: statement.trim(),
             currency: pdfCurrency,
-            usdRate: pdfCurrency === "USD" ? String(usdRate).trim() : null,
+            usdRate: pdfCurrency === "SYP" ? String(usdRate).trim() : null,
             grandTotalText,
             grandNumeric: grandNum,
             lines: lineSnapshots,
@@ -706,7 +706,9 @@ export function AdminPricingClient() {
     setPdfCurrency(row.currency);
     if (row.usdRate) setUsdRate(row.usdRate);
     setPaymentTerms(row.paymentTerms);
-    const seeds = snapshotSeedsToQuote(row.lines, products);
+    const rateNum = row.usdRate != null ? Number(String(row.usdRate).replace(/[^\d.]/g, "")) : NaN;
+    const sypPerUsd = Number.isFinite(rateNum) && rateNum > 0 ? rateNum : 15000;
+    const seeds = snapshotSeedsToQuote(row.lines, products, { sypPerUsdFallback: sypPerUsd });
     const nextLines: QuoteLine[] = [];
     for (const s of seeds) {
       if (s.kind === "product") {
@@ -750,8 +752,10 @@ export function AdminPricingClient() {
       const { generateAdminQuoteBlob } = await import("@/lib/admin-quote-pdf");
       const rate = row.usdRate != null ? Number(String(row.usdRate).replace(/[^\d.]/g, "")) : 0;
       const currencyNote =
-        row.currency === "USD" && Number.isFinite(rate) && rate > 0
-          ? `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`
+        row.currency === "USD"
+          ? Number.isFinite(rate) && rate > 0
+            ? `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`
+            : "الدولار الأمريكي — وفق أسعار الكتالوج بالدولار"
           : "الليرة السورية";
       const pdfLines = row.lines.map((l) => ({
         sku: l.sku,
@@ -885,6 +889,47 @@ export function AdminPricingClient() {
       .catch(() => toast.error("تعذر إنشاء التقرير."));
   };
 
+  const downloadInvoiceLogPdf = async () => {
+    if (invoiceHistory.length === 0) {
+      toast.message("لا توجد فواتير في السجل المعروض.");
+      return;
+    }
+    if (invoiceLogPdfLoading) return;
+    setInvoiceLogPdfLoading(true);
+    try {
+      const { computeInvoiceLogSummary, mapSourcesToPdfRows, generateInvoiceLogReportBlob } = await import(
+        "@/lib/admin-invoice-log-report-pdf"
+      );
+      const sources = invoiceHistory.map((inv) => ({
+        createdAt: inv.createdAt,
+        invoiceNo: inv.invoiceNo,
+        toSir: inv.toSir,
+        grandTotalText: inv.grandTotalText,
+        grandNumeric: Number(inv.grandNumeric) || 0,
+        currency: inv.currency,
+        paymentTerms: inv.paymentTerms,
+        linesCount: inv.lines.length || inv.linesCount,
+        fromDb: inv.fromDb,
+      }));
+      const summary = computeInvoiceLogSummary(sources);
+      const rows = mapSourcesToPdfRows(sources);
+      const generatedAtStr = new Date().toLocaleString("ar-SY");
+      const blob = await generateInvoiceLogReportBlob({ generatedAtStr, rows, summary });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `تقرير-سجل-فواتير-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("تم تنزيل تقرير PDF.");
+    } catch (e) {
+      console.error(e);
+      toast.error("تعذر إنشاء تقرير PDF.");
+    } finally {
+      setInvoiceLogPdfLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loggingIn) return;
@@ -931,11 +976,12 @@ export function AdminPricingClient() {
     setPreviewInvoice(null);
     setToSir("");
     setStatement("");
-    setPdfCurrency("SYP");
+    setPdfCurrency("USD");
     setUsdRate("15000");
     setInvoiceDate(new Date().toISOString().slice(0, 10));
     const d = new Date();
     setInvoiceNo(`INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`);
+    setAdminTab("gift-list");
     setGateOk(false);
     toast.message("تم الخروج.");
   };
@@ -957,7 +1003,7 @@ export function AdminPricingClient() {
         return;
       }
       setProducts((prev) => prev.map((p) => (p.slug === slug ? json.data! : p)));
-      setPriceDrafts((prev) => ({ ...prev, [slug]: normalizeSypCurrencyLabel(String(json.data!.price ?? "")) }));
+      setPriceDrafts((prev) => ({ ...prev, [slug]: String(json.data!.price ?? "").trim() }));
       toast.success("تم حفظ السعر.");
     } catch {
       toast.error("حدث خطأ أثناء حفظ السعر.");
@@ -1026,8 +1072,10 @@ export function AdminPricingClient() {
         <div className="container mx-auto max-w-5xl px-4 py-8">
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <h1 className="mb-1 text-2xl font-bold sm:text-3xl">الإدارة — تسعير الهدايا</h1>
-              <p className="text-sm text-muted-foreground sm:text-base">عرض الأسعار وحساب الإجمالي وتصدير PDF.</p>
+              <h1 className="mb-1 text-2xl font-bold sm:text-3xl">الإدارة</h1>
+              <p className="text-sm text-muted-foreground sm:text-base">
+                قائمة الهدايا والأسعار، أو تسعير الهدايا وحاسبة العروض وتصدير PDF.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -1050,6 +1098,43 @@ export function AdminPricingClient() {
             </div>
           </div>
 
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between" role="tablist" aria-label="أقسام الإدارة">
+            <div className="flex w-full flex-row-reverse flex-wrap gap-1 rounded-lg border bg-muted/40 p-1 sm:w-auto sm:inline-flex">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={adminTab === "gift-list"}
+                className={cn(
+                  "flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors sm:flex-initial",
+                  adminTab === "gift-list"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setAdminTab("gift-list")}
+              >
+                <Package className="h-4 w-4 shrink-0" />
+                قائمة الهدايا والأسعار
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={adminTab === "gift-pricing"}
+                className={cn(
+                  "flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors sm:flex-initial",
+                  adminTab === "gift-pricing"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setAdminTab("gift-pricing")}
+              >
+                <Calculator className="h-4 w-4 shrink-0" />
+                تسعير الهدايا
+              </button>
+            </div>
+          </div>
+
+          {adminTab === "gift-pricing" && (
+            <>
           <Card className="mb-6">
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-4">
               <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -1057,6 +1142,17 @@ export function AdminPricingClient() {
                 سجل الفواتير الصادرة
               </CardTitle>
               <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  className="min-h-[44px] bg-[#0b443a] hover:bg-[#0b443a]/90"
+                  onClick={() => void downloadInvoiceLogPdf()}
+                  disabled={invoiceHistory.length === 0 || invoiceLogPdfLoading}
+                >
+                  <FileText className="ml-2 h-4 w-4" />
+                  {invoiceLogPdfLoading ? "جاري إعداد PDF..." : "تقرير PDF احترافي"}
+                </Button>
                 <Button
                   type="button"
                   variant="secondary"
@@ -1267,10 +1363,10 @@ export function AdminPricingClient() {
                       الدولار الأمريكي
                     </label>
                   </div>
-                  {pdfCurrency === "USD" && (
+                  {pdfCurrency === "SYP" && (
                     <div>
                       <label htmlFor="usd-rate" className="mb-1 block text-sm text-muted-foreground">
-                        سعر الصرف (ليرة سورية للدولار الواحد)
+                        سعر الصرف (ليرة سورية للدولار الواحد) — لتحويل أسعار الكتالوج من الدولار
                       </label>
                       <Input
                         id="usd-rate"
@@ -1339,7 +1435,7 @@ export function AdminPricingClient() {
                                 <div className="font-medium truncate">{p.name}</div>
                                 <div className="mt-1 flex flex-wrap gap-2">
                                   <Badge variant="outline">كود: {p.sku}</Badge>
-                                  <Badge variant="outline">السعر (عرض USD): {formatGiftPriceUsdLabel(String(p.price ?? ""))}</Badge>
+                                  <Badge variant="outline">السعر: {formatGiftPriceUsdLabel(String(p.price ?? ""))}</Badge>
                                 </div>
                               </div>
                               <Button type="button" onClick={() => addQuoteLine(p.slug)} disabled={already} className="min-h-[44px] shrink-0">
@@ -1377,13 +1473,13 @@ export function AdminPricingClient() {
                   </div>
                   <div>
                     <label htmlFor="custom-line-price" className="mb-1 block text-sm text-muted-foreground">
-                      السعر (ل.س)
+                      السعر (USD)
                     </label>
                     <Input
                       id="custom-line-price"
                       value={customPriceDraft}
                       onChange={(e) => setCustomPriceDraft(e.target.value)}
-                      placeholder="مثال: 15000"
+                      placeholder="مثال: 12.50 أو 12.50 USD"
                       inputMode="decimal"
                       className="min-h-[44px]"
                     />
@@ -1473,7 +1569,7 @@ export function AdminPricingClient() {
                                         onChange={(e) => setCustomLinePriceInput(l.customId!, e.target.value)}
                                         inputMode="decimal"
                                         className="min-h-[44px] tabular-nums"
-                                        placeholder="ل.س"
+                                        placeholder="USD"
                                       />
                                     ) : (
                                       l.unitPriceText || "—"
@@ -1487,7 +1583,7 @@ export function AdminPricingClient() {
                                       className="min-h-[44px] w-28 text-center tabular-nums"
                                     />
                                   </td>
-                                  <td className="p-3 tabular-nums">{l.unitNum > 0 ? formatMoney(l.totalNum) : "—"}</td>
+                                  <td className="p-3 tabular-nums">{l.unitUsd > 0 ? formatUsdCalculatorDisplay(l.totalUsd) : "—"}</td>
                                   <td className="p-3">
                                     <Button
                                       type="button"
@@ -1508,84 +1604,95 @@ export function AdminPricingClient() {
                       </div>
                       <div className="mt-4 flex items-center justify-between rounded-md border bg-muted/30 px-4 py-3">
                         <div className="text-sm text-muted-foreground">المجموع النهائي</div>
-                        <div className="text-lg font-bold tabular-nums">{formatMoney(quoteComputed.grand)}</div>
+                        <div className="text-lg font-bold tabular-nums">{formatUsdCalculatorDisplay(quoteComputed.grandUsd)}</div>
                       </div>
                     </>
                   )}
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader className="py-4">
-                  <CardTitle className="text-base">قائمة الهدايا والأسعار</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">عرض سريع للأسعار المخزنة داخل كل هدية.</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
-                    <table className="w-full min-w-[760px] text-right text-sm">
-                      <thead className="bg-muted">
-                        <tr>
-                          <th className="p-3 w-10">#</th>
-                          <th className="p-3">الهدية</th>
-                          <th className="p-3 w-24">SKU</th>
-                          <th className="p-3 min-w-[220px]">السعر</th>
-                          <th className="p-3 w-28">حفظ</th>
-                          <th className="p-3 w-28">إضافة</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products
-                          .filter((p) => !p.archived)
-                          .slice(0, 200)
-                          .map((p, i) => (
-                            <tr key={p.slug} className="border-t">
-                              <td className="p-3">{i + 1}</td>
-                              <td className="p-3 font-medium">{p.name}</td>
-                              <td className="p-3">{p.sku}</td>
-                              <td className="p-3">
-                                <Input
-                                  value={priceDrafts[p.slug] ?? ""}
-                                  onChange={(e) => setPriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
-                                  placeholder="مثال: 25000 ل.س"
-                                  className="min-h-[44px]"
-                                />
-                              </td>
-                              <td className="p-3">
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  size="sm"
-                                  className="min-h-[44px] w-full"
-                                  onClick={() => void saveProductPrice(p.slug)}
-                                  disabled={savingSlug === p.slug || loadingProducts}
-                                >
-                                  {savingSlug === p.slug ? "جاري الحفظ..." : "حفظ"}
-                                </Button>
-                              </td>
-                              <td className="p-3">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="min-h-[44px]"
-                                  onClick={() => addQuoteLine(p.slug)}
-                                  disabled={quoteLines.some((x) => x.kind === "product" && x.slug === p.slug)}
-                                >
-                                  <Plus className="ml-2 h-4 w-4" /> إضافة
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    تم عرض أول 200 هدية فقط لتجنب البطء. استخدم البحث لإضافة أي هدية بسرعة.
-                  </p>
-                </CardContent>
-              </Card>
             </CardContent>
           </Card>
+            </>
+          )}
+
+          {adminTab === "gift-list" && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Package className="h-5 w-5 shrink-0" />
+                  قائمة الهدايا والأسعار
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">عرض سريع للأسعار المخزنة بالدولار داخل كل هدية.</p>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
+                  <table className="w-full min-w-[760px] text-right text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="p-3 w-10">#</th>
+                        <th className="p-3">الهدية</th>
+                        <th className="p-3 w-24">SKU</th>
+                        <th className="p-3 min-w-[220px]">السعر</th>
+                        <th className="p-3 w-28">حفظ</th>
+                        <th className="p-3 w-28">إضافة للحاسبة</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products
+                        .filter((p) => !p.archived)
+                        .slice(0, 200)
+                        .map((p, i) => (
+                          <tr key={p.slug} className="border-t">
+                            <td className="p-3">{i + 1}</td>
+                            <td className="p-3 font-medium">{p.name}</td>
+                            <td className="p-3">{p.sku}</td>
+                            <td className="p-3">
+                              <Input
+                                value={priceDrafts[p.slug] ?? ""}
+                                onChange={(e) => setPriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
+                                placeholder="مثال: 29.99 USD"
+                                className="min-h-[44px]"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="min-h-[44px] w-full"
+                                onClick={() => void saveProductPrice(p.slug)}
+                                disabled={savingSlug === p.slug || loadingProducts}
+                              >
+                                {savingSlug === p.slug ? "جاري الحفظ..." : "حفظ"}
+                              </Button>
+                            </td>
+                            <td className="p-3">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="min-h-[44px]"
+                                onClick={() => {
+                                  setAdminTab("gift-pricing");
+                                  addQuoteLine(p.slug);
+                                }}
+                                disabled={quoteLines.some((x) => x.kind === "product" && x.slug === p.slug)}
+                              >
+                                <Plus className="ml-2 h-4 w-4" /> إضافة
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  تم عرض أول 200 هدية فقط لتجنب البطء. زر «إضافة» ينقلك إلى تبويب تسعير الهدايا ويضيف الهدية للحاسبة. يمكنك أيضاً
+                  استخدام البحث هناك لإضافة أي هدية.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
 

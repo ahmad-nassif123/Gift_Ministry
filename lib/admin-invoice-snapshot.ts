@@ -1,5 +1,6 @@
 import type { Product } from "@/data/products";
 import type { AdminPricingInvoiceLineSnapshot } from "@/lib/admin-pricing-invoices-db";
+import { parseGiftPriceUsdAmount, roundCatalogUsd } from "@/lib/catalog-price-display";
 
 /** استخراج عدد صحيح تقريبي من نص سعر قد يحتوي أرقام عربية أو لاتينية */
 export function parseRoughIntegerFromPriceText(raw: string): number {
@@ -24,22 +25,42 @@ export type SnapshotQuoteSeed =
 /** تحويل بنود الفاتورة المخزّنة إلى مدخلات الحاسبة (مطابقة SKU أو بند يدوي). */
 export function snapshotSeedsToQuote(
   lines: AdminPricingInvoiceLineSnapshot[],
-  products: Product[]
+  products: Product[],
+  opts?: { sypPerUsdFallback?: number }
 ): SnapshotQuoteSeed[] {
+  const rate =
+    opts?.sypPerUsdFallback != null &&
+    Number.isFinite(opts.sypPerUsdFallback) &&
+    opts.sypPerUsdFallback > 0
+      ? opts.sypPerUsdFallback
+      : 15000;
+
   const bySku = new Map(products.map((p) => [p.sku.trim().toUpperCase(), p] as const));
   const out: SnapshotQuoteSeed[] = [];
 
+  function customUnitInput(ln: AdminPricingInvoiceLineSnapshot): string {
+    if (ln.unitUsd != null && Number.isFinite(ln.unitUsd) && ln.unitUsd >= 0) {
+      return String(roundCatalogUsd(ln.unitUsd));
+    }
+    if (ln.unitSyp != null && Number.isFinite(ln.unitSyp) && ln.unitSyp >= 0) {
+      return String(roundCatalogUsd(ln.unitSyp / rate));
+    }
+    const fromText = parseGiftPriceUsdAmount(ln.unitPriceText);
+    if (fromText > 0) return String(roundCatalogUsd(fromText));
+    const legacySyp = parseRoughIntegerFromPriceText(ln.unitPriceText);
+    return legacySyp > 0 ? String(roundCatalogUsd(legacySyp / rate)) : "0";
+  }
+
   for (const ln of lines) {
     const qty = Math.max(0, Math.min(999999, Math.floor(Number(ln.qty) || 0)));
-    let unitInput = "";
-    if (ln.unitSyp != null && Number.isFinite(ln.unitSyp) && ln.unitSyp >= 0) {
-      unitInput = String(Math.floor(ln.unitSyp));
-    } else {
-      unitInput = String(parseRoughIntegerFromPriceText(ln.unitPriceText) || 0);
-    }
 
     if (ln.custom) {
-      out.push({ kind: "custom", name: ln.name.trim() || "بند يدوي", unitPriceInput: unitInput || "0", qty: qty || 1 });
+      out.push({
+        kind: "custom",
+        name: ln.name.trim() || "بند يدوي",
+        unitPriceInput: customUnitInput(ln) || "0",
+        qty: qty || 1,
+      });
       continue;
     }
 
@@ -48,7 +69,12 @@ export function snapshotSeedsToQuote(
     if (p) {
       out.push({ kind: "product", slug: p.slug, qty: qty || 1 });
     } else {
-      out.push({ kind: "custom", name: ln.name.trim() || "بند", unitPriceInput: unitInput || "0", qty: qty || 1 });
+      out.push({
+        kind: "custom",
+        name: ln.name.trim() || "بند",
+        unitPriceInput: customUnitInput(ln) || "0",
+        qty: qty || 1,
+      });
     }
   }
 
