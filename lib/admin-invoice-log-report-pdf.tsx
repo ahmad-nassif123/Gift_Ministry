@@ -19,6 +19,26 @@ export type InvoiceLogReportSource = {
   fromDb: boolean;
 };
 
+function formatDateTimeAr(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    const date = d.toLocaleDateString("ar-SY", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const time = d.toLocaleTimeString("ar-SY", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    // تجنّب الفاصلة العربية "،" التي قد تربك RTL في PDF
+    return `${date} — ${time}`;
+  } catch {
+    return iso;
+  }
+}
+
 export function computeInvoiceLogSummary(list: InvoiceLogReportSource[]): InvoiceLogReportPdfSummary {
   let sypCash = 0;
   let sypDeferred = 0;
@@ -51,19 +71,14 @@ export function computeInvoiceLogSummary(list: InvoiceLogReportSource[]): Invoic
 
 export function mapSourcesToPdfRows(list: InvoiceLogReportSource[]): InvoiceLogReportPdfRow[] {
   return list.map((inv, i) => {
-    let createdAtDisplay = inv.createdAt;
-    try {
-      createdAtDisplay = new Date(inv.createdAt).toLocaleString("ar-SY");
-    } catch {
-      //
-    }
+    const createdAtDisplay = formatDateTimeAr(inv.createdAt);
     return {
       idx: i + 1,
       createdAtDisplay,
       invoiceNo: inv.invoiceNo.trim(),
       toSir: inv.toSir.trim(),
       grandTotalText: inv.grandTotalText.trim(),
-      currencyLabel: inv.currency === "USD" ? "USD" : "ل.س",
+      currencyLabel: inv.currency === "USD" ? "دولار" : "ل.س",
       paymentLabel: inv.paymentTerms === "deferred" ? "مؤجل" : "نقدي",
       linesCount: Math.max(0, Math.floor(inv.linesCount)),
       sourceLabel: inv.fromDb ? "قاعدة" : "محلي",

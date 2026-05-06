@@ -55,11 +55,23 @@ function formatCurrencyTextAr(raw: string): string {
   const isSyp = /ل\.س|ر\.س|\bSYP\b/i.test(t);
   const n = parseLooseNumber(t);
 
-  if (isUsd && n != null) return `${formatArabicIndicDecimal(n)} دولار`;
-  if (isSyp && n != null) return `${formatArabicIndicInt(n)} ل.س`;
+  // في مستند RTL من الأفضل وضع اسم العملة أولاً لتجنّب انقسام النص/انقلاب ترتيب الحروف
+  if (isUsd && n != null) return `دولار ${formatArabicIndicDecimal(n)}`;
+  if (isSyp && n != null) return `ل.س ${formatArabicIndicInt(n)}`;
 
   // تحسين عرض الاختصارات الشائعة إن وُجدت دون القدرة على التحليل
   return t.replace(/\bUSD\b/gi, "دولار").replace(/\bSYP\b/gi, "ل.س");
+}
+
+function normalizeArDateTimeLabel(s: string): string {
+  const raw = String(s ?? "").trim();
+  if (!raw) return "—";
+  // بعض صيغ toLocaleString تُدخل "،" بشكل يلتبس مع ":" في RTL عند العرض داخل PDF
+  return raw
+    .replace(/[،,]\s*/g, " — ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/—\s*—/g, "—")
+    .trim();
 }
 
 const styles = StyleSheet.create({
@@ -314,7 +326,8 @@ export function InvoiceLogReportPDF({
   const sypAll = summary.sypCash + summary.sypDeferred;
   const usdAll = summary.usdCash + summary.usdDeferred;
 
-  const fmtUsd = (n: number) => `${formatArabicIndicDecimal(n)} دولار`;
+  const fmtUsd = (n: number) => `دولار ${formatArabicIndicDecimal(n)}`;
+  const fmtSyp = (n: number) => `ل.س ${formatArabicIndicInt(n)}`;
 
   return (
     <Document>
@@ -324,7 +337,7 @@ export function InvoiceLogReportPDF({
             <>
               <Text style={styles.title}>تقرير سجل الفواتير الصادرة</Text>
               <View style={styles.titleUnderline} />
-              <Text style={styles.subtitle}>تاريخ إعداد التقرير: {generatedAtStr}</Text>
+              <Text style={styles.subtitle}>تاريخ إعداد التقرير ({normalizeArDateTimeLabel(generatedAtStr)})</Text>
               <View style={styles.summaryWrap}>
                 <Text style={styles.summaryTitle}>ملخص مالي — وفق الفواتير الظاهرة في الجدول</Text>
                 <View style={styles.summaryRow}>
@@ -335,15 +348,15 @@ export function InvoiceLogReportPDF({
                   />
                   <SummaryStat
                     label="إجمالي الليرة السورية — نقدي"
-                    value={`${formatArabicIndicInt(summary.sypCash)} ل.س`}
+                    value={fmtSyp(summary.sypCash)}
                   />
                   <SummaryStat
                     label="إجمالي الليرة السورية — مؤجل"
-                    value={`${formatArabicIndicInt(summary.sypDeferred)} ل.س`}
+                    value={fmtSyp(summary.sypDeferred)}
                   />
                 </View>
                 <View style={styles.summaryRow}>
-                  <SummaryStat label="مجموع الليرة السورية" value={`${formatArabicIndicInt(sypAll)} ل.س`} />
+                  <SummaryStat label="مجموع الليرة السورية" value={fmtSyp(sypAll)} />
                   <SummaryStat label="إجمالي الدولار — نقدي" value={fmtUsd(summary.usdCash)} />
                   <SummaryStat label="إجمالي الدولار — مؤجل" value={fmtUsd(summary.usdDeferred)} />
                   <SummaryStat label="مجموع الدولار الأمريكي" value={fmtUsd(usdAll)} />

@@ -913,7 +913,12 @@ export function AdminPricingClient() {
       }));
       const summary = computeInvoiceLogSummary(sources);
       const rows = mapSourcesToPdfRows(sources);
-      const generatedAtStr = new Date().toLocaleString("ar-SY");
+      const now = new Date();
+      const generatedAtStr = `${now.toLocaleDateString("ar-SY", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      })} — ${now.toLocaleTimeString("ar-SY", { hour: "2-digit", minute: "2-digit" })}`;
       const blob = await generateInvoiceLogReportBlob({ generatedAtStr, rows, summary });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
