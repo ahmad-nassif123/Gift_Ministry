@@ -369,11 +369,13 @@ export function AdminQuotePDF({
   const figuresAmountUsd = `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
   const baseSeal = "قسم الانتاج الفني — أصل صادر من النظام — غير صالح للتعديل اليدوي";
+  const baseSealDots = "قسم انتاج الفني . أصل صادر من النظام . غير صالح للتعديل اليدوي .";
   const inv = (meta.invoiceNo || "—").trim();
   const dt = (meta.documentDateStr || "").trim();
   const microFrag = `${dt} | ${baseSeal} | ${inv} | `;
   const microLine = Array.from({ length: 6 }, () => microFrag.repeat(6)).join("");
-  const bgBody = Array.from({ length: 18 }, () => microFrag.repeat(8)).join("\n");
+  const bgFrag = `${baseSealDots} ${baseSealDots} ${inv ? `${inv} . ` : ""}${dt ? `${dt} .` : ""}`;
+  const bgBody = Array.from({ length: 22 }, () => bgFrag).join("\n");
 
   return (
     <Document>
@@ -475,7 +477,16 @@ export function AdminQuotePDF({
           </View>
         </View>
 
-        {/* تم حذف خانة التوقيع حسب التصميم المطلوب */}
+        <View style={styles.signatureRow}>
+          <View style={styles.signatureBlock}>
+            <Text style={styles.signatureTitle}>المستلم</Text>
+            <View style={styles.signatureLine} />
+          </View>
+          <View style={styles.signatureBlock}>
+            <Text style={styles.signatureTitle}>المسلّم</Text>
+            <View style={styles.signatureLine} />
+          </View>
+        </View>
       </Page>
     </Document>
   );
