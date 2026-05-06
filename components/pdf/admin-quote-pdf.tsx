@@ -362,7 +362,7 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.tableSecurityWrap}>
-          <View style={styles.tableSealWrap} pointerEvents="none">
+          <View style={styles.tableSealWrap}>
             {/* طبقة زيتي */}
             <Text style={styles.tableSealTextOlive}>{baseSeal}</Text>
             {/* طبقة ذهبي (إزاحة بسيطة لمنع القص/التلاعب) */}
