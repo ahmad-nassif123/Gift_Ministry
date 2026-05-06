@@ -11,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AlertTriangle } from "lucide-react";
 
 export type AppConfirmOptions = {
   title?: string;
@@ -62,18 +63,34 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
       >
         <AlertDialogContent dir="rtl" className="gap-4">
           <AlertDialogHeader>
-            <AlertDialogTitle>{opts?.title ?? "تأكيد"}</AlertDialogTitle>
-            <AlertDialogDescription className="text-foreground/90">
-              {opts?.message ?? ""}
-            </AlertDialogDescription>
+            <div className="flex items-start gap-3">
+              <div
+                className={
+                  opts?.danger
+                    ? "mt-0.5 rounded-full bg-destructive/10 p-2 text-destructive"
+                    : "mt-0.5 rounded-full bg-primary/10 p-2 text-primary"
+                }
+              >
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <AlertDialogTitle className="text-right">{opts?.title ?? "تأكيد"}</AlertDialogTitle>
+                <AlertDialogDescription className="mt-1 text-foreground/90">
+                  {opts?.message ?? ""}
+                </AlertDialogDescription>
+              </div>
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row flex-wrap justify-start gap-2 sm:gap-3">
+            <AlertDialogCancel type="button" className="min-w-24" onClick={() => settle(false)}>
+              {opts?.cancelLabel ?? "إلغاء"}
+            </AlertDialogCancel>
             <AlertDialogAction
               type="button"
               className={
                 opts?.danger
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive"
-                  : ""
+                  ? "min-w-24 bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive"
+                  : "min-w-24"
               }
               onClick={(e) => {
                 e.preventDefault();
@@ -82,9 +99,6 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
             >
               {opts?.confirmLabel ?? "متابعة"}
             </AlertDialogAction>
-            <AlertDialogCancel type="button" onClick={() => settle(false)}>
-              {opts?.cancelLabel ?? "إلغاء"}
-            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

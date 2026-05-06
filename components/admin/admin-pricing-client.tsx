@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useConfirm } from "@/components/confirm-dialog-provider";
 import type { Product } from "@/data/products";
 import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
 import { formatGiftPriceUsdLabel, parseGiftPriceUsdAmount, roundCatalogUsd } from "@/lib/catalog-price-display";
@@ -169,6 +170,7 @@ function formatInvoiceDateAr(isoYmd: string): string {
 }
 
 export function AdminPricingClient() {
+  const confirm = useConfirm();
   const [gateOk, setGateOk] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
@@ -797,7 +799,14 @@ export function AdminPricingClient() {
   };
 
   const deleteInvoiceFromLog = async (row: InvoiceHistoryRow) => {
-    if (!window.confirm("حذف هذه الفاتورة من السجل؟")) return;
+    const ok = await confirm({
+      title: "حذف الفاتورة",
+      message: `هل تريد حذف هذه الفاتورة من السجل؟\n\nرقم الفاتورة: ${row.invoiceNo || "—"}`,
+      confirmLabel: "حذف",
+      cancelLabel: "إلغاء",
+      danger: true,
+    });
+    if (!ok) return;
     if (row.fromDb && row.serverId != null) {
       try {
         const res = await fetch(`/api/admin/pricing/invoices/${row.serverId}`, {
