@@ -125,17 +125,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: COLORS.gray50,
   },
-  metaGrid: {
-    flexDirection: "row-reverse",
-    alignItems: "stretch",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  metaLeftBlank: {
-    flex: 1,
-  },
-  metaRightInfo: {
-    width: "44%",
+  metaRowsWrap: {
+    width: "100%",
+    alignSelf: "stretch",
   },
   metaRow: {
     fontFamily: "Tajawal",
@@ -144,7 +136,7 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontFamily: "Tajawal",
-    width: "22%",
+    width: "26%",
     fontSize: 9,
     fontWeight: 700,
     color: COLORS.primary,
@@ -323,7 +315,7 @@ const styles = StyleSheet.create({
   },
 });
 
-/** عرض الأعمدة (row-reverse: أول عنصر = أقصى اليمين). الترتيب: رمز، اسم، عدد، وحدة، سعر، قيمة */
+/** عرض الأعمدة (row-reverse: أول عنصر = أقصى اليمين). الترتيب: رمز، اسم، وحدة، عدد، سعر، قيمة */
 const col = {
   sku: "12%",
   name: "30%",
@@ -390,33 +382,30 @@ export function AdminQuotePDF({
         <Text style={styles.letterhead}>قسم الانتاج الفني</Text>
 
         <View style={styles.metaBlock}>
-          <View style={styles.metaGrid}>
-            <View style={styles.metaLeftBlank} />
-            <View style={styles.metaRightInfo}>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>إلى السيد</Text>
-                <Text style={styles.metaValue}>{meta.toSir || "—"}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>البيان</Text>
-                <Text style={styles.metaValue}>{meta.statement || "—"}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>رقم الفاتورة</Text>
-                <Text style={styles.metaValue}>{meta.invoiceNo || "—"}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>التاريخ</Text>
-                <Text style={styles.metaValue}>{meta.documentDateStr}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>طريقة السداد</Text>
-                <Text style={styles.metaValue}>{meta.paymentLabel ?? "—"}</Text>
-              </View>
-              <View style={[styles.metaRow, { marginBottom: 0 }]}>
-                <Text style={styles.metaLabel}>العملة</Text>
-                <Text style={styles.metaValue}>{meta.currencyNote}</Text>
-              </View>
+          <View style={styles.metaRowsWrap}>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>إلى السيد</Text>
+              <Text style={styles.metaValue}>{meta.toSir || "—"}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>البيان</Text>
+              <Text style={styles.metaValue}>{meta.statement || "—"}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>رقم الفاتورة</Text>
+              <Text style={styles.metaValue}>{meta.invoiceNo || "—"}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>التاريخ</Text>
+              <Text style={styles.metaValue}>{meta.documentDateStr}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>طريقة السداد</Text>
+              <Text style={styles.metaValue}>{meta.paymentLabel ?? "—"}</Text>
+            </View>
+            <View style={[styles.metaRow, { marginBottom: 0 }]}>
+              <Text style={styles.metaLabel}>العملة</Text>
+              <Text style={styles.metaValue}>{meta.currencyNote}</Text>
             </View>
           </View>
         </View>
@@ -438,8 +427,8 @@ export function AdminQuotePDF({
           <View style={styles.tableHeader}>
             <Text style={[styles.th, { width: col.sku }]}>رمز المادة</Text>
             <Text style={[styles.th, { width: col.name, textAlign: "right" }]}>اسم المادة</Text>
-            <Text style={[styles.th, { width: col.qty }]}>العدد</Text>
             <Text style={[styles.th, { width: col.unit }]}>الوحدة</Text>
+            <Text style={[styles.th, { width: col.qty }]}>العدد</Text>
             <Text style={[styles.th, { width: col.price }]}>السعر</Text>
             <Text style={[styles.th, { width: col.value }]}>القيمة</Text>
           </View>
@@ -452,8 +441,8 @@ export function AdminQuotePDF({
               <View key={`${i}-${l.sku}-${l.name}-${q}`} style={rowStyle}>
                 <Text style={[styles.td, { width: col.sku }]}>{l.sku || "—"}</Text>
                 <Text style={[styles.td, styles.tdName, { width: col.name }]}>{l.name}</Text>
-                <Text style={[styles.td, { width: col.qty }]}>{qtyText}</Text>
                 <Text style={[styles.td, { width: col.unit }]}>{l.unit}</Text>
+                <Text style={[styles.td, { width: col.qty }]}>{qtyText}</Text>
                 <Text style={[styles.td, { width: col.price }]}>{l.unitPriceText}</Text>
                 <Text style={[styles.td, { width: col.value }]}>{l.lineValueText}</Text>
               </View>
@@ -471,13 +460,19 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.wordsBox}>
-          <Text style={styles.wordsLabel}>المبلغ كتابةً</Text>
+          <Text style={styles.wordsLabel}>المبلغ كتابة</Text>
           <Text style={styles.wordsText}>{words}</Text>
           <View style={styles.figuresTitleRow}>
-            <Text style={styles.figuresLabelText}>رقماً</Text>
-            <Text style={styles.figuresAmountText}>
-              {currency === "SYP" ? figuresAmountSyp : figuresAmountUsd}
-            </Text>
+            {currency === "SYP" ? (
+              <>
+                <Text style={styles.figuresLabelText}>رقماً</Text>
+                <Text style={styles.figuresAmountText}>{figuresAmountSyp}</Text>
+              </>
+            ) : (
+              <Text style={styles.figuresAmountText}>
+                {`${figuresAmountUsd} رقماً`}
+              </Text>
+            )}
           </View>
         </View>
 
