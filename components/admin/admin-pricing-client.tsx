@@ -192,6 +192,9 @@ export function AdminPricingClient() {
   const [previewInvoice, setPreviewInvoice] = useState<InvoiceHistoryRow | null>(null);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [savingSlug, setSavingSlug] = useState<string | null>(null);
+  const [importingPrices, setImportingPrices] = useState(false);
+  const [applyingImportedPrices, setApplyingImportedPrices] = useState(false);
+  const [importedPriceDrafts, setImportedPriceDrafts] = useState<Record<string, string> | null>(null);
 
   const [invoiceNo, setInvoiceNo] = useState(() => {
     const d = new Date();
@@ -1017,6 +1020,115 @@ export function AdminPricingClient() {
     }
   };
 
+  const importPricesFromExcel = async (file: File) => {
+    if (importingPrices) return;
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
+      toast.error("الملف يجب أن يكون Excel (.xlsx أو .xls).");
+      return;
+    }
+    setImportingPrices(true);
+    setImportedPriceDrafts(null);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheetName = wb.SheetNames?.[0];
+      if (!sheetName) {
+        toast.error("ملف Excel لا يحتوي على صفحات.");
+        return;
+      }
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, unknown>[];
+      if (!rows.length) {
+        toast.error("ملف Excel فارغ.");
+        return;
+      }
+
+      const bySku = new Map(products.map((p) => [String(p.sku ?? "").trim().toLowerCase(), p.slug] as const));
+      const next: Record<string, string> = {};
+      let matched = 0;
+      let skipped = 0;
+
+      for (const r of rows) {
+        const slugRaw =
+          String(r.slug ?? r.Slug ?? r.SLUG ?? r["Slug"] ?? r["slug"] ?? "").trim();
+        const skuRaw =
+          String(r.SKU ?? r.sku ?? r["SKU"] ?? r["sku"] ?? "").trim();
+        const priceRaw =
+          String(r["السعر"] ?? r.price ?? r.Price ?? r.PRICE ?? r["price"] ?? r["Price"] ?? "").trim();
+
+        const slug = slugRaw;
+        const sku = skuRaw;
+        const price = priceRaw;
+
+        const resolvedSlug =
+          slug ||
+          (sku ? bySku.get(sku.toLowerCase()) : undefined) ||
+          "";
+
+        if (!resolvedSlug || price === "") {
+          skipped += 1;
+          continue;
+        }
+        if (!bySlug.get(resolvedSlug)) {
+          skipped += 1;
+          continue;
+        }
+        next[resolvedSlug] = price;
+        matched += 1;
+      }
+
+      if (matched === 0) {
+        toast.error("لم يتم العثور على صفوف صالحة. تأكد من وجود عمود slug أو SKU وعمود السعر.");
+        return;
+      }
+
+      setImportedPriceDrafts(next);
+      setPriceDrafts((prev) => ({ ...prev, ...next }));
+      toast.success(`تم استيراد ${matched} سعر${matched === 1 ? "" : ""}. تم تجاهل ${skipped} صف.`);
+    } catch (e) {
+      console.error(e);
+      toast.error("تعذر قراءة ملف Excel.");
+    } finally {
+      setImportingPrices(false);
+    }
+  };
+
+  const applyImportedPrices = async () => {
+    if (applyingImportedPrices) return;
+    if (!importedPriceDrafts) {
+      toast.message("لم يتم استيراد أسعار بعد.");
+      return;
+    }
+    const slugs = Object.keys(importedPriceDrafts);
+    if (slugs.length === 0) {
+      toast.message("لا توجد أسعار مطابقة للتطبيق.");
+      return;
+    }
+    setApplyingImportedPrices(true);
+    try {
+      let ok = 0;
+      let fail = 0;
+      for (const slug of slugs) {
+        try {
+          // نعتمد على priceDrafts التي تم دمجها بالفعل
+          // eslint-disable-next-line no-await-in-loop
+          await saveProductPrice(slug);
+          ok += 1;
+        } catch {
+          fail += 1;
+        }
+      }
+      if (fail === 0) toast.success(`تم تحديث ${ok} سعر في الموقع.`);
+      else toast.message(`تم تحديث ${ok} سعر، وفشل ${fail}.`);
+      setImportedPriceDrafts(null);
+    } finally {
+      setApplyingImportedPrices(false);
+    }
+  };
+
   if (gateOk === null) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -1630,6 +1742,41 @@ export function AdminPricingClient() {
                 <p className="text-sm text-muted-foreground mt-1">عرض سريع للأسعار المخزنة بالدولار داخل كل هدية.</p>
               </CardHeader>
               <CardContent>
+                <div className="mb-4 rounded-lg border bg-card p-4 space-y-3">
+                  <p className="text-sm font-semibold">استيراد أسعار من Excel</p>
+                  <p className="text-xs text-muted-foreground">
+                    يدعم الأعمدة: <span className="font-medium">slug</span> أو <span className="font-medium">SKU</span> + <span className="font-medium">السعر</span>.
+                    (يمكنك استخدام الملف الذي يصدره النظام نفسه.)
+                  </p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void importPricesFromExcel(f);
+                        e.currentTarget.value = "";
+                      }}
+                      className="block w-full text-sm"
+                      disabled={importingPrices || loadingProducts}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="min-h-[44px] sm:shrink-0"
+                      disabled={!importedPriceDrafts || applyingImportedPrices || savingSlug != null}
+                      onClick={() => void applyImportedPrices()}
+                    >
+                      {applyingImportedPrices ? "جاري التحديث..." : "تطبيق الأسعار على الموقع"}
+                    </Button>
+                  </div>
+                  {importedPriceDrafts && (
+                    <p className="text-xs text-muted-foreground">
+                      جاهز للتطبيق: {Object.keys(importedPriceDrafts).length} سعر.
+                    </p>
+                  )}
+                </div>
+
                 <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
                   <table className="w-full min-w-[760px] text-right text-sm">
                     <thead className="bg-muted">
