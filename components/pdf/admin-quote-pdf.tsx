@@ -42,6 +42,23 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     position: "relative",
   },
+  /** طبقة علامة مائية خلفية (شفافة) تغطي كامل الصفحة. */
+  securityBgLayer: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    right: 8,
+    bottom: 8,
+    opacity: 0.055,
+  },
+  securityBgText: {
+    fontFamily: "Tajawal",
+    fontSize: 7,
+    lineHeight: 1.25,
+    color: COLORS.primary,
+    textAlign: "right",
+    transform: "rotate(-18deg)",
+  },
   /** إطار الجدول — نضع عليه ختم شفاف لمنع القص/الاستبدال. */
   tableSecurityWrap: {
     position: "relative",
@@ -326,12 +343,16 @@ export function AdminQuotePDF({
   const baseSeal = "قسم الانتاج الفني — أصل صادر من النظام — غير صالح للتعديل اليدوي";
   const inv = (meta.invoiceNo || "—").trim();
   const dt = (meta.documentDateStr || "").trim();
-  const microFrag = `${baseSeal} | ${inv} | ${dt} | `;
+  const microFrag = `${dt} | ${baseSeal} | ${inv} | `;
   const microLine = Array.from({ length: 6 }, () => microFrag.repeat(6)).join("");
+  const bgBody = Array.from({ length: 18 }, () => microFrag.repeat(8)).join("\n");
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        <View style={styles.securityBgLayer} fixed>
+          <Text style={styles.securityBgText}>{bgBody}</Text>
+        </View>
         <Text style={styles.letterhead}>قسم الانتاج الفني</Text>
 
         <View style={styles.metaBlock}>
@@ -419,7 +440,7 @@ export function AdminQuotePDF({
 
         <View style={styles.signatureRow}>
           <View style={styles.signatureBlock}>
-            <Text style={styles.signatureTitle}>المستلم</Text>
+            <Text style={styles.signatureTitle}>المسلّم</Text>
             <View style={styles.signatureLine} />
           </View>
           <View style={styles.signatureBlock}>
