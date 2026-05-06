@@ -125,6 +125,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: COLORS.gray50,
   },
+  metaGrid: {
+    flexDirection: "row-reverse",
+    alignItems: "stretch",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  metaLeftBlank: {
+    flex: 1,
+  },
+  metaRightInfo: {
+    width: "44%",
+  },
   metaRow: {
     fontFamily: "Tajawal",
     flexDirection: "row-reverse",
@@ -144,6 +156,22 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: COLORS.gray700,
     textAlign: "right",
+  },
+  invWatermarkWrap: {
+    position: "absolute",
+    top: "46%",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.06,
+  },
+  invWatermarkText: {
+    fontFamily: "Tajawal",
+    fontSize: 48,
+    fontWeight: 900,
+    color: COLORS.gray200,
+    transform: "rotate(-24deg)",
   },
   tableHeader: {
     fontFamily: "Tajawal",
@@ -356,30 +384,39 @@ export function AdminQuotePDF({
         <Text style={styles.letterhead}>قسم الانتاج الفني</Text>
 
         <View style={styles.metaBlock}>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>إلى السيد</Text>
-            <Text style={styles.metaValue}>{meta.toSir || "—"}</Text>
+          <View style={styles.metaGrid}>
+            <View style={styles.metaLeftBlank} />
+            <View style={styles.metaRightInfo}>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>إلى السيد</Text>
+                <Text style={styles.metaValue}>{meta.toSir || "—"}</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>البيان</Text>
+                <Text style={styles.metaValue}>{meta.statement || "—"}</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>رقم الفاتورة</Text>
+                <Text style={styles.metaValue}>{meta.invoiceNo || "—"}</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>التاريخ</Text>
+                <Text style={styles.metaValue}>{meta.documentDateStr}</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>طريقة السداد</Text>
+                <Text style={styles.metaValue}>{meta.paymentLabel ?? "—"}</Text>
+              </View>
+              <View style={[styles.metaRow, { marginBottom: 0 }]}>
+                <Text style={styles.metaLabel}>العملة</Text>
+                <Text style={styles.metaValue}>{meta.currencyNote}</Text>
+              </View>
+            </View>
           </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>البيان</Text>
-            <Text style={styles.metaValue}>{meta.statement || "—"}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>رقم الفاتورة</Text>
-            <Text style={styles.metaValue}>{meta.invoiceNo || "—"}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>التاريخ</Text>
-            <Text style={styles.metaValue}>{meta.documentDateStr}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>طريقة السداد</Text>
-            <Text style={styles.metaValue}>{meta.paymentLabel ?? "—"}</Text>
-          </View>
-          <View style={[styles.metaRow, { marginBottom: 0 }]}>
-            <Text style={styles.metaLabel}>العملة</Text>
-            <Text style={styles.metaValue}>{meta.currencyNote}</Text>
-          </View>
+        </View>
+
+        <View style={styles.invWatermarkWrap} fixed>
+          <Text style={styles.invWatermarkText}>{inv || "—"}</Text>
         </View>
 
         <View style={styles.tableSecurityWrap}>
@@ -438,16 +475,7 @@ export function AdminQuotePDF({
           </View>
         </View>
 
-        <View style={styles.signatureRow}>
-          <View style={styles.signatureBlock}>
-            <Text style={styles.signatureTitle}>المسلّم</Text>
-            <View style={styles.signatureLine} />
-          </View>
-          <View style={styles.signatureBlock}>
-            <Text style={styles.signatureTitle}>المسلّم</Text>
-            <View style={styles.signatureLine} />
-          </View>
-        </View>
+        {/* تم حذف خانة التوقيع حسب التصميم المطلوب */}
       </Page>
     </Document>
   );
