@@ -21,6 +21,7 @@ Font.register({
 
 const COLORS = {
   primary: "#0b443a",
+  gold: "#C8A24A",
   white: "#ffffff",
   gray50: "#f8faf9",
   gray200: "#e5e7eb",
@@ -41,38 +42,50 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     position: "relative",
   },
-  /** طبقة micro-text خلف المحتوى (شفافة). */
-  securityMicroLayer: {
-    position: "absolute",
-    top: 6,
-    left: 6,
-    right: 6,
-    bottom: 6,
-    opacity: 0.055,
+  /** إطار الجدول — نضع عليه ختم شفاف لمنع القص/الاستبدال. */
+  tableSecurityWrap: {
+    position: "relative",
   },
-  securityMicroText: {
-    fontFamily: "Tajawal",
-    fontSize: 5,
-    lineHeight: 1.15,
-    color: COLORS.primary,
-    textAlign: "right",
-  },
-  /** علامة مائية مائلة: قسم الإنتاج + رقم الفاتورة */
-  securityWatermarkWrap: {
+  /** ختم شفاف فوق الجدول فقط (طبقتان متداخلتان). */
+  tableSealWrap: {
     position: "absolute",
-    top: "32%",
-    left: 0,
-    right: 0,
+    top: 26,
+    left: 10,
+    right: 10,
+    height: 96,
     alignItems: "center",
     justifyContent: "center",
-    opacity: 0.09,
+    opacity: 0.14,
   },
-  securityWatermarkText: {
+  tableSealTextOlive: {
     fontFamily: "Tajawal",
-    fontSize: 26,
-    fontWeight: 700,
+    fontSize: 16,
+    fontWeight: 900,
     color: COLORS.primary,
-    transform: "rotate(-28deg)",
+    textAlign: "center",
+  },
+  tableSealTextGold: {
+    fontFamily: "Tajawal",
+    fontSize: 16,
+    fontWeight: 900,
+    color: COLORS.gold,
+    textAlign: "center",
+  },
+  /** microtext داخل إطار رفيع أسفل الجدول. */
+  microLineBox: {
+    marginTop: 6,
+    paddingTop: 2,
+    paddingBottom: 1,
+    borderTopWidth: 1,
+    borderTopColor: "#d9e2df",
+  },
+  microLineText: {
+    fontFamily: "Tajawal",
+    fontSize: 5.2,
+    color: COLORS.primary,
+    opacity: 0.35,
+    textAlign: "right",
+    lineHeight: 1.1,
   },
   /** ترويسة المستند */
   letterhead: {
@@ -310,21 +323,15 @@ export function AdminQuotePDF({
   const figuresAmountSyp = `${formatArabicIndicInt(Math.floor(n))} ل.س`;
   const figuresAmountUsd = `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
-  const microFrag =
-    "قسم الانتاج الفني . أصل صادر من النظام . غير صالح للتعديل اليدوي . ";
-  const securityMicroBody = Array.from({ length: 14 }, () => microFrag.repeat(4)).join("\n");
-  const watermarkPhrase = `قسم الانتاج الفني   ${(meta.invoiceNo || "—").trim()}`;
+  const baseSeal = "قسم الانتاج الفني — أصل صادر من النظام — غير صالح للتعديل اليدوي";
+  const inv = (meta.invoiceNo || "—").trim();
+  const dt = (meta.documentDateStr || "").trim();
+  const microFrag = `${baseSeal} | ${inv} | ${dt} | `;
+  const microLine = Array.from({ length: 6 }, () => microFrag.repeat(6)).join("");
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.securityMicroLayer} fixed>
-          <Text style={styles.securityMicroText}>{securityMicroBody}</Text>
-        </View>
-        <View style={styles.securityWatermarkWrap} fixed>
-          <Text style={styles.securityWatermarkText}>{watermarkPhrase}</Text>
-        </View>
-
         <Text style={styles.letterhead}>قسم الانتاج الفني</Text>
 
         <View style={styles.metaBlock}>
@@ -354,31 +361,45 @@ export function AdminQuotePDF({
           </View>
         </View>
 
-        <View style={styles.tableHeader}>
-          <Text style={[styles.th, { width: col.sku }]}>رمز المادة</Text>
-          <Text style={[styles.th, { width: col.name, textAlign: "right" }]}>اسم المادة</Text>
-          <Text style={[styles.th, { width: col.qty }]}>العدد</Text>
-          <Text style={[styles.th, { width: col.unit }]}>الوحدة</Text>
-          <Text style={[styles.th, { width: col.price }]}>السعر</Text>
-          <Text style={[styles.th, { width: col.value }]}>القيمة</Text>
+        <View style={styles.tableSecurityWrap}>
+          <View style={styles.tableSealWrap} pointerEvents="none">
+            {/* طبقة زيتي */}
+            <Text style={styles.tableSealTextOlive}>{baseSeal}</Text>
+            {/* طبقة ذهبي (إزاحة بسيطة لمنع القص/التلاعب) */}
+            <Text style={[styles.tableSealTextGold, { marginTop: -18, marginRight: 1 }]}>
+              {baseSeal}
+            </Text>
+          </View>
+
+          <View style={styles.tableHeader}>
+            <Text style={[styles.th, { width: col.sku }]}>رمز المادة</Text>
+            <Text style={[styles.th, { width: col.name, textAlign: "right" }]}>اسم المادة</Text>
+            <Text style={[styles.th, { width: col.qty }]}>العدد</Text>
+            <Text style={[styles.th, { width: col.unit }]}>الوحدة</Text>
+            <Text style={[styles.th, { width: col.price }]}>السعر</Text>
+            <Text style={[styles.th, { width: col.value }]}>القيمة</Text>
+          </View>
+
+          {lines.map((l, i) => {
+            const rowStyle = i % 2 === 1 ? [styles.tr, styles.trEven] : styles.tr;
+            const q = Math.max(0, Math.floor(Number.isFinite(l.qty) ? l.qty : 0));
+            const qtyText = currency === "SYP" ? formatArabicIndicInt(q, false) : String(q);
+            return (
+              <View key={`${i}-${l.sku}-${l.name}-${q}`} style={rowStyle}>
+                <Text style={[styles.td, { width: col.sku }]}>{l.sku || "—"}</Text>
+                <Text style={[styles.td, styles.tdName, { width: col.name }]}>{l.name}</Text>
+                <Text style={[styles.td, { width: col.qty }]}>{qtyText}</Text>
+                <Text style={[styles.td, { width: col.unit }]}>{l.unit}</Text>
+                <Text style={[styles.td, { width: col.price }]}>{l.unitPriceText}</Text>
+                <Text style={[styles.td, { width: col.value }]}>{l.lineValueText}</Text>
+              </View>
+            );
+          })}
         </View>
 
-        {lines.map((l, i) => {
-          const rowStyle = i % 2 === 1 ? [styles.tr, styles.trEven] : styles.tr;
-          const q = Math.max(0, Math.floor(Number.isFinite(l.qty) ? l.qty : 0));
-          const qtyText =
-            currency === "SYP" ? formatArabicIndicInt(q, false) : String(q);
-          return (
-            <View key={`${i}-${l.sku}-${l.name}-${q}`} style={rowStyle}>
-              <Text style={[styles.td, { width: col.sku }]}>{l.sku || "—"}</Text>
-              <Text style={[styles.td, styles.tdName, { width: col.name }]}>{l.name}</Text>
-              <Text style={[styles.td, { width: col.qty }]}>{qtyText}</Text>
-              <Text style={[styles.td, { width: col.unit }]}>{l.unit}</Text>
-              <Text style={[styles.td, { width: col.price }]}>{l.unitPriceText}</Text>
-              <Text style={[styles.td, { width: col.value }]}>{l.lineValueText}</Text>
-            </View>
-          );
-        })}
+        <View style={styles.microLineBox}>
+          <Text style={styles.microLineText}>{microLine}</Text>
+        </View>
 
         <View style={styles.totalsRow}>
           <Text style={styles.totalsLabel}>المجموع النهائي</Text>
