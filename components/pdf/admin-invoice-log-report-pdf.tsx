@@ -34,6 +34,34 @@ function formatArabicIndicInt(n: number): string {
   return v.toLocaleString("ar-SA", { numberingSystem: "arab", useGrouping: true });
 }
 
+function formatArabicIndicDecimal(n: number): string {
+  const v = Number.isFinite(n) ? Math.max(0, n) : 0;
+  return v.toLocaleString("ar-SA", { numberingSystem: "arab", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function parseLooseNumber(raw: string): number | null {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  const cleaned = s.replace(/[^\d.,]/g, "").replace(/,/g, "");
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatCurrencyTextAr(raw: string): string {
+  const t = String(raw ?? "").trim();
+  if (!t) return "—";
+  const isUsd = /\bUSD\b|\$/i.test(t);
+  const isSyp = /ل\.س|ر\.س|\bSYP\b/i.test(t);
+  const n = parseLooseNumber(t);
+
+  if (isUsd && n != null) return `${formatArabicIndicDecimal(n)} دولار`;
+  if (isSyp && n != null) return `${formatArabicIndicInt(n)} ل.س`;
+
+  // تحسين عرض الاختصارات الشائعة إن وُجدت دون القدرة على التحليل
+  return t.replace(/\bUSD\b/gi, "دولار").replace(/\bSYP\b/gi, "ل.س");
+}
+
 const styles = StyleSheet.create({
   page: {
     fontFamily: "Tajawal",
@@ -286,8 +314,7 @@ export function InvoiceLogReportPDF({
   const sypAll = summary.sypCash + summary.sypDeferred;
   const usdAll = summary.usdCash + summary.usdDeferred;
 
-  const fmtUsd = (n: number) =>
-    `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  const fmtUsd = (n: number) => `${formatArabicIndicDecimal(n)} دولار`;
 
   return (
     <Document>
@@ -297,7 +324,7 @@ export function InvoiceLogReportPDF({
             <>
               <Text style={styles.title}>تقرير سجل الفواتير الصادرة</Text>
               <View style={styles.titleUnderline} />
-              <Text style={styles.subtitle}>تاريخ إعداد المستند: {generatedAtStr}</Text>
+              <Text style={styles.subtitle}>تاريخ إعداد التقرير: {generatedAtStr}</Text>
               <View style={styles.summaryWrap}>
                 <Text style={styles.summaryTitle}>ملخص مالي — وفق الفواتير الظاهرة في الجدول</Text>
                 <View style={styles.summaryRow}>
@@ -342,7 +369,8 @@ export function InvoiceLogReportPDF({
               const globalIdx = pageIdx * ROWS_PER_PAGE + i;
               const even = globalIdx % 2 === 1;
               const truncatedSir = r.toSir.length > 44 ? `${r.toSir.slice(0, 42)}…` : r.toSir;
-              const truncatedTotal = r.grandTotalText.length > 30 ? `${r.grandTotalText.slice(0, 28)}…` : r.grandTotalText;
+              const prettyTotal = formatCurrencyTextAr(r.grandTotalText);
+              const truncatedTotal = prettyTotal.length > 30 ? `${prettyTotal.slice(0, 28)}…` : prettyTotal;
               return (
                 <View key={`${r.idx}-${globalIdx}`} style={even ? [styles.tr, styles.trEven] : styles.tr} wrap={false}>
                   <Text style={[styles.td, styles.tdCenter, { width: col.source }]}>{r.sourceLabel}</Text>
