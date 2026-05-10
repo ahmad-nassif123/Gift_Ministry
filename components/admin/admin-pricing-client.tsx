@@ -169,6 +169,11 @@ function formatInvoiceDateAr(isoYmd: string): string {
   return dt.toLocaleDateString("ar-SY", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 }
 
+/** اسم ملف فريد في كل تحميل حتى لا يُستبدل ملف PDF القديم صامتًا في مجلد التنزيلات (ينطبق على Windows خصوصًا). */
+function invoicePdfDownloadFilename(safeInvoiceKey: string, fallbackLabel: string): string {
+  return `فاتورة-${safeInvoiceKey || fallbackLabel}-${Date.now()}.pdf`;
+}
+
 export function AdminPricingClient() {
   const confirm = useConfirm();
   const [gateOk, setGateOk] = useState<boolean | null>(null);
@@ -569,7 +574,7 @@ export function AdminPricingClient() {
       const a = document.createElement("a");
       a.href = url;
       const safeInv = invoiceNo.trim().replace(/[^\w\u0600-\u06FF-]+/g, "_").slice(0, 40);
-      a.download = `فاتورة-${safeInv || "عرض-أسعار"}.pdf`;
+      a.download = invoicePdfDownloadFilename(safeInv, "عرض-أسعار");
       a.click();
       URL.revokeObjectURL(url);
 
@@ -788,7 +793,7 @@ export function AdminPricingClient() {
       const a = document.createElement("a");
       a.href = url;
       const safeInv = row.invoiceNo.replace(/[^\w\u0600-\u06FF-]+/g, "_").slice(0, 40);
-      a.download = `فاتورة-${safeInv || "نسخة"}.pdf`;
+      a.download = invoicePdfDownloadFilename(safeInv, "نسخة");
       a.click();
       URL.revokeObjectURL(url);
       toast.success("تم إعداد ملف PDF.");
@@ -926,11 +931,12 @@ export function AdminPricingClient() {
       const summary = computeInvoiceLogSummary(sources);
       const rows = mapSourcesToPdfRows(sources);
       const now = new Date();
-      const generatedAtStr = `${now.toLocaleDateString("ar-SY", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })} — ${now.toLocaleTimeString("ar-SY", { hour: "2-digit", minute: "2-digit" })}`;
+      const pad2 = (n: number) => String(Math.max(0, Math.floor(n))).padStart(2, "0");
+      const toArDigits = (s: string) =>
+        s.replace(/\d/g, (d) => ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"][Number(d)] ?? d);
+      const generatedAtStr = toArDigits(
+        `${now.getFullYear()}/${pad2(now.getMonth() + 1)}/${pad2(now.getDate())} — ${pad2(now.getHours())}:${pad2(now.getMinutes())}`
+      );
       const blob = await generateInvoiceLogReportBlob({ generatedAtStr, rows, summary });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

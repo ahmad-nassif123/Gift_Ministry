@@ -19,21 +19,27 @@ export type InvoiceLogReportSource = {
   fromDb: boolean;
 };
 
+function toArabicIndicDigitsLatin(input: string): string {
+  return input.replace(/\d/g, (d) =>
+    ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"][Number(d)] ?? d
+  );
+}
+
+function pad2(n: number): string {
+  return String(Math.max(0, Math.floor(n))).padStart(2, "0");
+}
+
+/** تنسيق ثابت بدون علامات اتجاه/ص/م: YYYY/MM/DD — HH:MM (24h) */
 function formatDateTimeAr(iso: string): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    const date = d.toLocaleDateString("ar-SY", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    const time = d.toLocaleTimeString("ar-SY", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    // تجنّب الفاصلة العربية "،" التي قد تربك RTL في PDF
-    return `${date} — ${time}`;
+    const yyyy = d.getFullYear();
+    const mm = pad2(d.getMonth() + 1);
+    const dd = pad2(d.getDate());
+    const hh = pad2(d.getHours());
+    const mi = pad2(d.getMinutes());
+    return toArabicIndicDigitsLatin(`${yyyy}/${mm}/${dd} — ${hh}:${mi}`);
   } catch {
     return iso;
   }
