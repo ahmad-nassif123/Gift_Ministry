@@ -81,7 +81,7 @@ const DEFAULT_ALLOWED_ADMIN_EMAILS = [
 ];
 
 export function getAllowedEmails(): string[] {
-  const env = process.env.ALLOWED_ADMIN_EMAILS ?? "";
+  const env = normalizeCommaLists(process.env.ALLOWED_ADMIN_EMAILS ?? "");
   const fromEnv = env
     .split(",")
     .map((e) => e.trim().toLowerCase())
@@ -95,8 +95,13 @@ export function isAllowedEmail(email: string): boolean {
   return list.includes(email.trim().toLowerCase());
 }
 
+/** توحيد فاصلة القوائم (نسخ من مستند عربي قد يضيف ، بدلاً من ,) */
+function normalizeCommaLists(raw: string): string {
+  return raw.replace(/\u060c/g, ",").trim();
+}
+
 function parseAdminCredentials(): Record<string, string> {
-  const raw = (process.env.ADMIN_CREDENTIALS ?? "").trim();
+  const raw = normalizeCommaLists(process.env.ADMIN_CREDENTIALS ?? "");
   const out: Record<string, string> = {};
   if (!raw) return out;
   // Support comma/newline/semicolon separated pairs (Vercel UI sometimes uses new lines)
@@ -116,7 +121,9 @@ function parseAdminCredentials(): Record<string, string> {
 
 export function checkAdminPassword(email: string, password: string): boolean {
   const e = email.trim().toLowerCase();
-  const pass = (password ?? "").trim();
+  const pass = (password ?? "")
+    .trim()
+    .replace(/[\u200b-\u200d\u2060\ufeff]/g, "");
   const map = parseAdminCredentials();
   if (!pass) return false;
   if (map[e] !== undefined) return pass === map[e];
@@ -190,7 +197,10 @@ export async function authorizeAdminLogin(
   password: string
 ): Promise<{ ok: true } | { ok: false; reason: "email" | "password" }> {
   const e = email.trim().toLowerCase();
-  const pass = (password ?? "").trim();
+  /** إزالة فراغات نهاية السطر وأحرف Unicode الخافية التي تنزل مع اللصق */
+  const pass = (password ?? "")
+    .trim()
+    .replace(/[\u200b-\u200d\u2060\ufeff]/g, "");
   if (!pass) return { ok: false, reason: "password" };
 
   let allowed = getAllowedEmails().includes(e);
