@@ -216,7 +216,9 @@ export async function authorizeAdminLogin(
     }
   }
 
+  const map = parseAdminCredentials();
   let allowed = getAllowedEmails().includes(e);
+  if (!allowed && map[e] !== undefined) allowed = true;
   if (!allowed && hasAdminDirectoryDb()) {
     try {
       allowed = await adminEmailExistsInDb(e);
@@ -226,7 +228,6 @@ export async function authorizeAdminLogin(
   }
   if (!allowed) return { ok: false, reason: "email" };
 
-  const map = parseAdminCredentials();
   if (map[e] !== undefined) {
     return pass === map[e] ? { ok: true } : { ok: false, reason: "password" };
   }
