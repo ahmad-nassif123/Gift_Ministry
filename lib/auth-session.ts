@@ -68,18 +68,26 @@ export async function deleteSessionCookie(): Promise<void> {
   cookieStore.delete(COOKIE_NAME);
 }
 
+/** يُدمَج مع `ALLOWED_ADMIN_EMAILS` حتى يبقى الدخول ممكناً إذا كان المتغير غير مضبوط أو ناقصاً على الاستضافة */
+const DEFAULT_ALLOWED_ADMIN_EMAILS = [
+  "media.team.damascus.2@gmail.com",
+  "k42746859@gmail.com",
+  "abdulkarimsaad165@gmail.com",
+];
+
 export function getAllowedEmails(): string[] {
   const env = process.env.ALLOWED_ADMIN_EMAILS ?? "";
   const fromEnv = env
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return fromEnv;
+  const fromDefaults = DEFAULT_ALLOWED_ADMIN_EMAILS.map((e) => e.trim().toLowerCase());
+  return [...new Set([...fromDefaults, ...fromEnv])];
 }
 
 export function isAllowedEmail(email: string): boolean {
   const list = getAllowedEmails();
-  return list.length > 0 && list.includes(email.trim().toLowerCase());
+  return list.includes(email.trim().toLowerCase());
 }
 
 function parseAdminCredentials(): Record<string, string> {
