@@ -99,7 +99,7 @@ function normalizeLoginPassword(raw: string): string {
 }
 
 function parseAdminCredentials(): Record<string, string> {
-  const raw = normalizeCommaLists(process.env.ADMIN_CREDENTIALS ?? "");
+  let raw = normalizeCommaLists(process.env.ADMIN_CREDENTIALS ?? "").replace(/^\ufeff/, "");
   const out: Record<string, string> = {};
   if (!raw) return out;
   // Support comma/newline/semicolon separated pairs (Vercel UI sometimes uses new lines)
@@ -120,6 +120,12 @@ function parseAdminCredentials(): Record<string, string> {
 export function checkAdminPassword(email: string, password: string): boolean {
   const e = email.trim().toLowerCase();
   const pass = normalizeLoginPassword(password ?? "");
+  if (!pass) return false;
+  const loginEmail = (process.env.ADMIN_LOGIN_EMAIL ?? "").trim().toLowerCase();
+  const loginPassEnv = normalizeLoginPassword(process.env.ADMIN_LOGIN_PASSWORD ?? "");
+  if (loginEmail && loginPassEnv.length >= 4 && e === loginEmail) {
+    return pass === loginPassEnv;
+  }
   const map = parseAdminCredentials();
   if (!pass) return false;
   if (map[e] !== undefined) return pass === map[e];
@@ -213,6 +219,15 @@ export async function authorizeAdminLogin(
         console.error("authorizeAdminLogin bootstrap:", err);
         return { ok: false, reason: "password" };
       }
+    }
+  }
+
+  /** بديل بسيط على Vercel: متغيران منفصلان دون صيغة email:pass في سطر واحد (يحل 403 عند عدم ربط ADMIN_CREDENTIALS بالمشروع) */
+  const loginEmail = (process.env.ADMIN_LOGIN_EMAIL ?? "").trim().toLowerCase();
+  const loginPassEnv = normalizeLoginPassword(process.env.ADMIN_LOGIN_PASSWORD ?? "");
+  if (loginEmail && loginPassEnv.length >= 4) {
+    if (e === loginEmail) {
+      return pass === loginPassEnv ? { ok: true } : { ok: false, reason: "password" };
     }
   }
 
