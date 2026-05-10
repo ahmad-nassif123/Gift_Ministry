@@ -174,7 +174,7 @@ export function AdminDirectoryClient() {
                   <CardTitle className="text-base">قاعدة البيانات غير متوفرة</CardTitle>
                   <CardDescription>
                     اربط Postgres (POSTGRES_URL أو DATABASE_URL على Vercel). بدون قاعدة بيانات لا تُخزَّن الحسابات من
-                    هذه الصفحة، ولن يعمل إلا إن ضبطت ADMIN_CREDENTIALS أو ADMIN_BOOTSTRAP يدوياً في البيئة.
+                    هذه الصفحة. دخول لوحة التحكم نفسه يعتمد على ADMIN_PASSWORD فقط.
                   </CardDescription>
                 </CardHeader>
               </Card>

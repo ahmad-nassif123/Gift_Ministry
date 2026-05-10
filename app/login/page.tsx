@@ -12,7 +12,6 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get("next") ?? "";
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -25,7 +24,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password, next: nextUrl || undefined }),
+        body: JSON.stringify({ password, next: nextUrl || undefined }),
         credentials: "include",
       });
       const data = await res.json();
@@ -47,25 +46,10 @@ function LoginForm() {
       <div className="text-center">
         <h1 className="text-2xl font-bold">تسجيل الدخول</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          للمسؤولين فقط — يُفضَّل ربط Postgres ثم إضافة الحسابات من الداشبورد (حسابات الدخول).
+          للمسؤولين فقط — أدخل كلمة مرور لوحة التحكم (تُضبط في متغير البيئة ADMIN_PASSWORD على الخادم).
         </p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="mb-1 block text-sm font-medium">
-            البريد الإلكتروني المعتمد
-          </label>
-          <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@example.com"
-            required
-            className="text-left"
-            dir="ltr"
-          />
-        </div>
         <div>
           <label htmlFor="password" className="mb-1 block text-sm font-medium">
             كلمة المرور
@@ -75,7 +59,9 @@ function LoginForm() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="كلمة المرور المعتمدة لحسابك"
+            placeholder="••••••••"
+            required
+            autoComplete="current-password"
             className="text-left"
             dir="ltr"
           />

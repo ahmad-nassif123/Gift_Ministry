@@ -1,39 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  authorizeAdminLogin,
+  authorizeDashboardPassword,
   createSessionToken,
+  getDashboardActorEmail,
   setSessionCookie,
 } from "@/lib/auth-session";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const email = (body.email as string)?.trim?.();
     const password = body.password;
+    const pass = typeof password === "string" ? password : "";
 
-    if (!email) {
-      return NextResponse.json(
-        { success: false, error: "البريد الإلكتروني مطلوب" },
-        { status: 400 }
-      );
-    }
-    const pass = typeof password === "string" ? password.trim() : "";
-
-    const auth = await authorizeAdminLogin(email, pass);
-    if (!auth.ok) {
-      if (auth.reason === "email") {
-        return NextResponse.json(
-          { success: false, error: "هذا البريد غير معتمد للدخول" },
-          { status: 403 }
-        );
-      }
+    if (!authorizeDashboardPassword(pass)) {
       return NextResponse.json(
         { success: false, error: "كلمة المرور غير صحيحة" },
         { status: 401 }
       );
     }
 
-    const token = createSessionToken(email);
+    const token = createSessionToken(getDashboardActorEmail());
     await setSessionCookie(token);
 
     const nextUrl = typeof body.next === "string" && body.next.startsWith("/") ? body.next : "/dashboard";

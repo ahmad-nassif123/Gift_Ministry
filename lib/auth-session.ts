@@ -1,12 +1,5 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
-import {
-  adminEmailExistsInDb,
-  countAdminAccounts,
-  hasAdminDirectoryDb,
-  upsertAdminAccount,
-  verifyAdminPasswordInDb,
-} from "@/lib/admin-directory-db";
 
 const COOKIE_NAME = "admin_session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 أيام
@@ -58,7 +51,6 @@ export async function getSession(): Promise<SessionPayload | null> {
   return verifySessionToken(token);
 }
 
-
 export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
@@ -75,63 +67,25 @@ export async function deleteSessionCookie(): Promise<void> {
   cookieStore.delete(COOKIE_NAME);
 }
 
-export function getAllowedEmails(): string[] {
-  const env = normalizeCommaLists(process.env.ALLOWED_ADMIN_EMAILS ?? "");
-  const fromEnv = env
-    .split(",")
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean);
-  return [...new Set(fromEnv)];
-}
-
-export function isAllowedEmail(email: string): boolean {
-  const list = getAllowedEmails();
-  return list.includes(email.trim().toLowerCase());
-}
-
-/** توحيد فاصلة القوائم (نسخ من مستند عربي قد يضيف ، بدلاً من ,) */
-function normalizeCommaLists(raw: string): string {
-  return raw.replace(/\u060c/g, ",").trim();
-}
-
 function normalizeLoginPassword(raw: string): string {
   return (raw ?? "").trim().replace(/[\u200b-\u200d\u2060\ufeff]/g, "");
 }
 
-function parseAdminCredentials(): Record<string, string> {
-  let raw = normalizeCommaLists(process.env.ADMIN_CREDENTIALS ?? "").replace(/^\ufeff/, "");
-  const out: Record<string, string> = {};
-  if (!raw) return out;
-  // Support comma/newline/semicolon separated pairs (Vercel UI sometimes uses new lines)
-  const pairs = raw
-    .split(/[,;\n\r]+/g)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  for (const p of pairs) {
-    const idx = p.indexOf(":");
-    if (idx <= 0) continue;
-    const email = p.slice(0, idx).trim().toLowerCase();
-    const pass = p.slice(idx + 1).trim();
-    if (email && pass) out[email] = pass;
-  }
-  return out;
+/** بريد ثابت في الجلسة لتتبّع الإجراءات في API — لا يُطلب من المستخدم عند الدخول */
+export function getDashboardActorEmail(): string {
+  const v = (process.env.DASHBOARD_SESSION_EMAIL ?? "").trim().toLowerCase();
+  if (v.length >= 5 && v.includes("@")) return v;
+  return "dashboard@gift-catalog.local";
 }
 
-export function checkAdminPassword(email: string, password: string): boolean {
-  const e = email.trim().toLowerCase();
-  const pass = normalizeLoginPassword(password ?? "");
+/** دخول لوحة التحكم بكلمة مرور واحدة: `ADMIN_PASSWORD`، أو إن وُجدت فقط `ADMIN_LOGIN_PASSWORD` كبديل */
+export function authorizeDashboardPassword(password: string): boolean {
+  const pass = normalizeLoginPassword(password);
   if (!pass) return false;
-  const loginEmail = (process.env.ADMIN_LOGIN_EMAIL ?? "").trim().toLowerCase();
-  const loginPassEnv = normalizeLoginPassword(process.env.ADMIN_LOGIN_PASSWORD ?? "");
-  if (loginEmail && loginPassEnv.length >= 4 && e === loginEmail) {
-    return pass === loginPassEnv;
-  }
-  const map = parseAdminCredentials();
-  if (!pass) return false;
-  if (map[e] !== undefined) return pass === map[e];
-  const expected = (process.env.ADMIN_PASSWORD ?? "").trim();
-  if (!expected) return false;
-  return pass === expected;
+  const primary = normalizeLoginPassword(process.env.ADMIN_PASSWORD ?? "");
+  if (primary.length > 0 && pass === primary) return true;
+  const fallback = normalizeLoginPassword(process.env.ADMIN_LOGIN_PASSWORD ?? "");
+  return fallback.length > 0 && pass === fallback;
 }
 
 const DIRECTORY_GATE_COOKIE = "admin_directory_gate";
@@ -192,70 +146,4 @@ export function getDirectoryGatePassword(): string {
 export async function getDirectoryGateCookieValue(): Promise<string | undefined> {
   const cookieStore = await cookies();
   return cookieStore.get(DIRECTORY_GATE_COOKIE)?.value;
-}
-
-export async function authorizeAdminLogin(
-  email: string,
-  password: string
-): Promise<{ ok: true } | { ok: false; reason: "email" | "password" }> {
-  const e = email.trim().toLowerCase();
-  const pass = normalizeLoginPassword(password ?? "");
-  if (!pass) return { ok: false, reason: "password" };
-
-  /** أول إعداد: لا توجد حسابات بعد + ADMIN_BOOTSTRAP_EMAIL/PASSWORD → يُنشئ أول صف في admin_accounts ثم يُسمح بالدخول */
-  if (hasAdminDirectoryDb()) {
-    const bootstrapEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL ?? "").trim().toLowerCase();
-    const bootstrapPass = normalizeLoginPassword(process.env.ADMIN_BOOTSTRAP_PASSWORD ?? "");
-    if (bootstrapEmail && bootstrapPass.length >= 4) {
-      try {
-        const n = await countAdminAccounts();
-        if (n === 0) {
-          if (e !== bootstrapEmail) return { ok: false, reason: "email" };
-          if (pass !== bootstrapPass) return { ok: false, reason: "password" };
-          await upsertAdminAccount(e, pass);
-          return { ok: true };
-        }
-      } catch (err) {
-        console.error("authorizeAdminLogin bootstrap:", err);
-        return { ok: false, reason: "password" };
-      }
-    }
-  }
-
-  /** بديل بسيط على Vercel: متغيران منفصلان دون صيغة email:pass في سطر واحد (يحل 403 عند عدم ربط ADMIN_CREDENTIALS بالمشروع) */
-  const loginEmail = (process.env.ADMIN_LOGIN_EMAIL ?? "").trim().toLowerCase();
-  const loginPassEnv = normalizeLoginPassword(process.env.ADMIN_LOGIN_PASSWORD ?? "");
-  if (loginEmail && loginPassEnv.length >= 4) {
-    if (e === loginEmail) {
-      return pass === loginPassEnv ? { ok: true } : { ok: false, reason: "password" };
-    }
-  }
-
-  const map = parseAdminCredentials();
-  let allowed = getAllowedEmails().includes(e);
-  if (!allowed && map[e] !== undefined) allowed = true;
-  if (!allowed && hasAdminDirectoryDb()) {
-    try {
-      allowed = await adminEmailExistsInDb(e);
-    } catch {
-      //
-    }
-  }
-  if (!allowed) return { ok: false, reason: "email" };
-
-  if (map[e] !== undefined) {
-    return pass === map[e] ? { ok: true } : { ok: false, reason: "password" };
-  }
-
-  if (hasAdminDirectoryDb()) {
-    try {
-      if (await verifyAdminPasswordInDb(e, pass)) return { ok: true };
-    } catch {
-      //
-    }
-  }
-
-  const expected = (process.env.ADMIN_PASSWORD ?? "").trim();
-  if (expected && pass === expected) return { ok: true };
-  return { ok: false, reason: "password" };
 }
