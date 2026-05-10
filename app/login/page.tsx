@@ -47,7 +47,7 @@ function LoginForm() {
       <div className="text-center">
         <h1 className="text-2xl font-bold">تسجيل الدخول</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          للمسؤولين فقط - لوحة التحكم
+          للمسؤولين فقط — يُفضَّل ربط Postgres ثم إضافة الحسابات من الداشبورد (حسابات الدخول).
         </p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -75,7 +75,7 @@ function LoginForm() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="اختياري إذا لم تُضبط كلمة مرور"
+            placeholder="كلمة المرور المعتمدة لحسابك"
             className="text-left"
             dir="ltr"
           />

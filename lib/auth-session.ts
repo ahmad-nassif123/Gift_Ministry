@@ -2,7 +2,9 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import {
   adminEmailExistsInDb,
+  countAdminAccounts,
   hasAdminDirectoryDb,
+  upsertAdminAccount,
   verifyAdminPasswordInDb,
 } from "@/lib/admin-directory-db";
 
@@ -73,21 +75,13 @@ export async function deleteSessionCookie(): Promise<void> {
   cookieStore.delete(COOKIE_NAME);
 }
 
-/** يُدمَج مع `ALLOWED_ADMIN_EMAILS` حتى يبقى الدخول ممكناً إذا كان المتغير غير مضبوط أو ناقصاً على الاستضافة */
-const DEFAULT_ALLOWED_ADMIN_EMAILS = [
-  "media.team.damascus.2@gmail.com",
-  "k42746859@gmail.com",
-  "abdulkarimsaad165@gmail.com",
-];
-
 export function getAllowedEmails(): string[] {
   const env = normalizeCommaLists(process.env.ALLOWED_ADMIN_EMAILS ?? "");
   const fromEnv = env
     .split(",")
-    .map((e) => e.trim().toLowerCase())
+    .map((x) => x.trim().toLowerCase())
     .filter(Boolean);
-  const fromDefaults = DEFAULT_ALLOWED_ADMIN_EMAILS.map((e) => e.trim().toLowerCase());
-  return [...new Set([...fromDefaults, ...fromEnv])];
+  return [...new Set(fromEnv)];
 }
 
 export function isAllowedEmail(email: string): boolean {
@@ -98,6 +92,10 @@ export function isAllowedEmail(email: string): boolean {
 /** توحيد فاصلة القوائم (نسخ من مستند عربي قد يضيف ، بدلاً من ,) */
 function normalizeCommaLists(raw: string): string {
   return raw.replace(/\u060c/g, ",").trim();
+}
+
+function normalizeLoginPassword(raw: string): string {
+  return (raw ?? "").trim().replace(/[\u200b-\u200d\u2060\ufeff]/g, "");
 }
 
 function parseAdminCredentials(): Record<string, string> {
@@ -121,9 +119,7 @@ function parseAdminCredentials(): Record<string, string> {
 
 export function checkAdminPassword(email: string, password: string): boolean {
   const e = email.trim().toLowerCase();
-  const pass = (password ?? "")
-    .trim()
-    .replace(/[\u200b-\u200d\u2060\ufeff]/g, "");
+  const pass = normalizeLoginPassword(password ?? "");
   const map = parseAdminCredentials();
   if (!pass) return false;
   if (map[e] !== undefined) return pass === map[e];
@@ -197,11 +193,28 @@ export async function authorizeAdminLogin(
   password: string
 ): Promise<{ ok: true } | { ok: false; reason: "email" | "password" }> {
   const e = email.trim().toLowerCase();
-  /** إزالة فراغات نهاية السطر وأحرف Unicode الخافية التي تنزل مع اللصق */
-  const pass = (password ?? "")
-    .trim()
-    .replace(/[\u200b-\u200d\u2060\ufeff]/g, "");
+  const pass = normalizeLoginPassword(password ?? "");
   if (!pass) return { ok: false, reason: "password" };
+
+  /** أول إعداد: لا توجد حسابات بعد + ADMIN_BOOTSTRAP_EMAIL/PASSWORD → يُنشئ أول صف في admin_accounts ثم يُسمح بالدخول */
+  if (hasAdminDirectoryDb()) {
+    const bootstrapEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL ?? "").trim().toLowerCase();
+    const bootstrapPass = normalizeLoginPassword(process.env.ADMIN_BOOTSTRAP_PASSWORD ?? "");
+    if (bootstrapEmail && bootstrapPass.length >= 4) {
+      try {
+        const n = await countAdminAccounts();
+        if (n === 0) {
+          if (e !== bootstrapEmail) return { ok: false, reason: "email" };
+          if (pass !== bootstrapPass) return { ok: false, reason: "password" };
+          await upsertAdminAccount(e, pass);
+          return { ok: true };
+        }
+      } catch (err) {
+        console.error("authorizeAdminLogin bootstrap:", err);
+        return { ok: false, reason: "password" };
+      }
+    }
+  }
 
   let allowed = getAllowedEmails().includes(e);
   if (!allowed && hasAdminDirectoryDb()) {
