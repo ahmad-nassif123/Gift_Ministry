@@ -7,6 +7,8 @@ import {
   type TodayGiftItem,
 } from "@/lib/today-gifts-db";
 
+export const dynamic = "force-dynamic";
+
 function isoDayOrToday(v: string | null): string {
   const day = (v ?? "").trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
