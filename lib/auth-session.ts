@@ -1,5 +1,10 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import {
+  adminEmailExistsInDb,
+  hasAdminDirectoryDb,
+  verifyAdminPasswordInDb,
+} from "@/lib/admin-directory-db";
 
 const COOKIE_NAME = "admin_session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 أيام
@@ -118,4 +123,100 @@ export function checkAdminPassword(email: string, password: string): boolean {
   const expected = (process.env.ADMIN_PASSWORD ?? "").trim();
   if (!expected) return false;
   return pass === expected;
+}
+
+const DIRECTORY_GATE_COOKIE = "admin_directory_gate";
+const DIRECTORY_GATE_MAX_AGE = 60 * 30; // 30 دقيقة
+
+interface DirectoryGatePayload {
+  exp: number;
+  typ: "admin_directory_gate";
+}
+
+export function createDirectoryGateToken(): string {
+  const payload: DirectoryGatePayload = {
+    exp: Math.floor(Date.now() / 1000) + DIRECTORY_GATE_MAX_AGE,
+    typ: "admin_directory_gate",
+  };
+  const payloadStr = JSON.stringify(payload);
+  const sig = sign(payloadStr);
+  return Buffer.from(payloadStr, "utf-8").toString("base64url") + "." + sig;
+}
+
+export function verifyDirectoryGateToken(token: string | undefined | null): boolean {
+  try {
+    if (!token) return false;
+    const [payloadB64, sig] = token.split(".");
+    if (!payloadB64 || !sig) return false;
+    const payloadStr = Buffer.from(payloadB64, "base64url").toString("utf-8");
+    if (sign(payloadStr) !== sig) return false;
+    const payload = JSON.parse(payloadStr) as DirectoryGatePayload;
+    if (payload.typ !== "admin_directory_gate") return false;
+    if (payload.exp < Math.floor(Date.now() / 1000)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function setDirectoryGateCookie(token: string): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(DIRECTORY_GATE_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: DIRECTORY_GATE_MAX_AGE,
+    path: "/",
+  });
+}
+
+export async function clearDirectoryGateCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(DIRECTORY_GATE_COOKIE);
+}
+
+export function getDirectoryGatePassword(): string {
+  const v = process.env.ADMIN_DIRECTORY_GATE_PASSWORD?.trim();
+  return v && v.length > 0 ? v : "20022026";
+}
+
+export async function getDirectoryGateCookieValue(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  return cookieStore.get(DIRECTORY_GATE_COOKIE)?.value;
+}
+
+export async function authorizeAdminLogin(
+  email: string,
+  password: string
+): Promise<{ ok: true } | { ok: false; reason: "email" | "password" }> {
+  const e = email.trim().toLowerCase();
+  const pass = (password ?? "").trim();
+  if (!pass) return { ok: false, reason: "password" };
+
+  let allowed = getAllowedEmails().includes(e);
+  if (!allowed && hasAdminDirectoryDb()) {
+    try {
+      allowed = await adminEmailExistsInDb(e);
+    } catch {
+      //
+    }
+  }
+  if (!allowed) return { ok: false, reason: "email" };
+
+  const map = parseAdminCredentials();
+  if (map[e] !== undefined) {
+    return pass === map[e] ? { ok: true } : { ok: false, reason: "password" };
+  }
+
+  if (hasAdminDirectoryDb()) {
+    try {
+      if (await verifyAdminPasswordInDb(e, pass)) return { ok: true };
+    } catch {
+      //
+    }
+  }
+
+  const expected = (process.env.ADMIN_PASSWORD ?? "").trim();
+  if (expected && pass === expected) return { ok: true };
+  return { ok: false, reason: "password" };
 }

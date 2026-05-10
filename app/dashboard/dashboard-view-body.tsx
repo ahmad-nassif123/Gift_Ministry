@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Edit, Trash2, Search, LogOut, Download, Upload, BarChart3, ClipboardList, FileText, QrCode, DownloadCloud, RefreshCw, AlertTriangle, RotateCcw, Printer, Eye, EyeOff, Sheet, Warehouse } from "lucide-react";
+import { Plus, Edit, Trash2, Search, LogOut, Download, Upload, BarChart3, ClipboardList, FileText, QrCode, DownloadCloud, RefreshCw, AlertTriangle, RotateCcw, Printer, Eye, EyeOff, Sheet, Warehouse, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -132,6 +132,12 @@ export function DashboardViewBody(props: DashboardViewReturnProps) {
             <Button variant="outline" size="lg" className="min-h-[44px] w-full touch-manipulation sm:w-auto">
               <DownloadCloud className="ml-2 h-5 w-5 shrink-0" />
               <span className="truncate">رموز QR</span>
+            </Button>
+          </Link>
+          <Link href="/dashboard/admin-directory" className="min-w-0">
+            <Button variant="outline" size="lg" className="min-h-[44px] w-full touch-manipulation sm:w-auto">
+              <KeyRound className="ml-2 h-5 w-5 shrink-0" />
+              <span className="truncate">حسابات الدخول</span>
             </Button>
           </Link>
           <Button onClick={handleAddProduct} size="lg" className="min-h-[44px] w-full touch-manipulation sm:w-auto col-span-2 sm:col-span-1">

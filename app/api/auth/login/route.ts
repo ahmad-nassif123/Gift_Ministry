@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  isAllowedEmail,
-  checkAdminPassword,
+  authorizeAdminLogin,
   createSessionToken,
   setSessionCookie,
 } from "@/lib/auth-session";
@@ -20,14 +19,14 @@ export async function POST(request: NextRequest) {
     }
     const pass = typeof password === "string" ? password.trim() : "";
 
-    if (!isAllowedEmail(email)) {
-      return NextResponse.json(
-        { success: false, error: "هذا البريد غير معتمد للدخول" },
-        { status: 403 }
-      );
-    }
-
-    if (!checkAdminPassword(email, pass)) {
+    const auth = await authorizeAdminLogin(email, pass);
+    if (!auth.ok) {
+      if (auth.reason === "email") {
+        return NextResponse.json(
+          { success: false, error: "هذا البريد غير معتمد للدخول" },
+          { status: 403 }
+        );
+      }
       return NextResponse.json(
         { success: false, error: "كلمة المرور غير صحيحة" },
         { status: 401 }
