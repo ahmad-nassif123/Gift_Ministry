@@ -140,7 +140,7 @@ export async function clearDirectoryGateCookie(): Promise<void> {
 
 export function getDirectoryGatePassword(): string {
   const v = process.env.ADMIN_DIRECTORY_GATE_PASSWORD?.trim();
-  return v && v.length > 0 ? v : "20022026";
+  return v && v.length > 0 ? v : "20002026";
 }
 
 export async function getDirectoryGateCookieValue(): Promise<string | undefined> {
