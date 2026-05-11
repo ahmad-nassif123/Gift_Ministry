@@ -29,13 +29,28 @@ function LoginForm() {
         body: JSON.stringify({ password, next: nextUrl || undefined }),
         credentials: "include",
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { success?: boolean; error?: string; redirect?: string } = {};
+      try {
+        if (raw) data = JSON.parse(raw) as typeof data;
+      } catch {
+        setError(
+          res.status === 401
+            ? "كلمة المرور غير صحيحة"
+            : "حدث خطأ أثناء الاتصال — استجابة غير متوقعة من الخادم"
+        );
+        return;
+      }
 
       if (data.success) {
         router.push(data.redirect ?? "/dashboard");
         return;
       }
-      setError(data.error ?? "فشل تسجيل الدخول");
+      if (res.status === 401) {
+        setError(data.error?.trim() || "كلمة المرور غير صحيحة");
+        return;
+      }
+      setError(data.error?.trim() || "فشل تسجيل الدخول");
     } catch {
       setError("حدث خطأ أثناء الاتصال");
     } finally {
