@@ -22,6 +22,7 @@ function LoginForm() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
+    let redirectTo: string | null = null;
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -43,18 +44,37 @@ function LoginForm() {
       }
 
       if (data.success) {
-        router.push(data.redirect ?? "/dashboard");
+        redirectTo = typeof data.redirect === "string" && data.redirect.startsWith("/")
+          ? data.redirect
+          : "/dashboard";
         return;
       }
       if (res.status === 401) {
         setError(data.error?.trim() || "كلمة المرور غير صحيحة");
         return;
       }
+      if (res.status === 503) {
+        setError(
+          data.error?.trim() ||
+            "تسجيل الدخول غير مفعّل على الخادم. أضف ADMIN_PASSWORD في Vercel ثم Redeploy."
+        );
+        return;
+      }
       setError(data.error?.trim() || "فشل تسجيل الدخول");
-    } catch {
-      setError("حدث خطأ أثناء الاتصال");
+    } catch (err) {
+      const isNetwork =
+        err instanceof TypeError &&
+        (String(err.message).includes("fetch") || String(err.message).includes("Failed to fetch"));
+      setError(
+        isNetwork
+          ? "تعذّر الاتصال بالخادم. تحقق من الإنترنت أو أن الرابط يبدأ بـ https وأنك على نفس موقع التطبيق."
+          : "حدث خطأ غير متوقع أثناء تسجيل الدخول."
+      );
     } finally {
       setSubmitting(false);
+    }
+    if (redirectTo) {
+      router.push(redirectTo);
     }
   };
 
