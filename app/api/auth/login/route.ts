@@ -3,6 +3,7 @@ import {
   authorizeDashboardPassword,
   createSessionToken,
   getDashboardActorEmail,
+  isDashboardLoginConfigured,
   setSessionCookie,
 } from "@/lib/auth-session";
 
@@ -13,6 +14,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const password = body.password;
     const pass = typeof password === "string" ? password : "";
+
+    if (!isDashboardLoginConfigured()) {
+      console.error("[auth/login] ADMIN_PASSWORD غير متاح على الخادم (فارغ أو غير مربوط بهذا النشر)");
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "تسجيل الدخول غير مفعّل على الخادم: أضف المتغير ADMIN_PASSWORD في إعدادات المشروع على Vercel (أو اربط المتغير المشترك بالمشروع) ثم نفّذ Redeploy.",
+        },
+        { status: 503 }
+      );
+    }
 
     if (!authorizeDashboardPassword(pass)) {
       return NextResponse.json(

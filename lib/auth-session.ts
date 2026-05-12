@@ -78,6 +78,13 @@ export function getDashboardActorEmail(): string {
   return "dashboard@gift-catalog.local";
 }
 
+/** هل مضبوط على الخادم أي من `ADMIN_PASSWORD` أو `ADMIN_LOGIN_PASSWORD` (غير فارغ بعد التطبيع) */
+export function isDashboardLoginConfigured(): boolean {
+  const primary = normalizeLoginPassword(process.env.ADMIN_PASSWORD ?? "");
+  const fallback = normalizeLoginPassword(process.env.ADMIN_LOGIN_PASSWORD ?? "");
+  return primary.length > 0 || fallback.length > 0;
+}
+
 /** دخول لوحة التحكم بكلمة مرور واحدة: `ADMIN_PASSWORD`، أو إن وُجدت فقط `ADMIN_LOGIN_PASSWORD` كبديل */
 export function authorizeDashboardPassword(password: string): boolean {
   const pass = normalizeLoginPassword(password);
