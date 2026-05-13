@@ -22,7 +22,6 @@ function LoginForm() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
-    let redirectTo: string | null = null;
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -44,9 +43,11 @@ function LoginForm() {
       }
 
       if (data.success) {
-        redirectTo = typeof data.redirect === "string" && data.redirect.startsWith("/")
-          ? data.redirect
-          : "/dashboard";
+        const dest =
+          typeof data.redirect === "string" && data.redirect.startsWith("/")
+            ? data.redirect
+            : "/dashboard";
+        router.push(dest);
         return;
       }
       if (res.status === 401) {
@@ -72,9 +73,6 @@ function LoginForm() {
       );
     } finally {
       setSubmitting(false);
-    }
-    if (redirectTo) {
-      router.push(redirectTo);
     }
   };
 
