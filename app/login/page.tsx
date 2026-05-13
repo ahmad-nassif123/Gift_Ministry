@@ -81,7 +81,7 @@ function LoginForm() {
       <div className="text-center">
         <h1 className="text-2xl font-bold">تسجيل الدخول</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          للمسؤولين فقط — أدخل كلمة مرور لوحة التحكم (تُضبط في متغير البيئة ADMIN_PASSWORD على الخادم).
+          للمسؤولين فقط — أدخل كلمة مرور لوحة التحكم (من متغير ADMIN_PASSWORD على الخادم، أو من القاعدة إن غيّرتها من لوحة التحكم بعد ربط Postgres).
         </p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">

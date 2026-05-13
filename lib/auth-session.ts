@@ -1,6 +1,11 @@
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import crypto from "crypto";
+import { verifyAdminPasswordHash } from "@/lib/admin-password";
+import {
+  getDashboardPasswordOverrideHash,
+  hasDashboardPasswordOverride,
+} from "@/lib/dashboard-password-db";
 
 const COOKIE_NAME = "admin_session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 أيام
@@ -106,7 +111,17 @@ export function isDashboardLoginConfigured(): boolean {
   return primary.length > 0 || fallback.length > 0;
 }
 
-/** دخول لوحة التحكم بكلمة مرور واحدة: `ADMIN_PASSWORD`، أو إن وُجدت فقط `ADMIN_LOGIN_PASSWORD` كبديل */
+/** يشمل كلمة المرور المحفوظة في Postgres (صفحة إدارة كلمة المرور) إن وُجدت */
+export async function isDashboardLoginConfiguredAsync(): Promise<boolean> {
+  if (isDashboardLoginConfigured()) return true;
+  try {
+    return await hasDashboardPasswordOverride();
+  } catch {
+    return false;
+  }
+}
+
+/** مطابقة كلمة المرور مع متغيرات البيئة فقط (بدون تجاوز القاعدة) */
 export function authorizeDashboardPassword(password: string): boolean {
   const pass = normalizeLoginPassword(password);
   if (!pass) return false;
@@ -114,6 +129,21 @@ export function authorizeDashboardPassword(password: string): boolean {
   if (primary.length > 0 && pass === primary) return true;
   const fallback = normalizeLoginPassword(process.env.ADMIN_LOGIN_PASSWORD ?? "");
   return fallback.length > 0 && pass === fallback;
+}
+
+/**
+ * التحقق من كلمة مرور `/login`: إن وُجدت كلمة في القاعدة تُستخدم وحدها؛ وإلا تُستخدم `ADMIN_PASSWORD` / `ADMIN_LOGIN_PASSWORD`.
+ */
+export async function verifyDashboardLoginPassword(password: string): Promise<boolean> {
+  const pass = normalizeLoginPassword(password);
+  if (!pass) return false;
+  try {
+    const stored = await getDashboardPasswordOverrideHash();
+    if (stored) return verifyAdminPasswordHash(pass, stored);
+  } catch {
+    // إذا تعذّر الاتصال بالقاعدة نجرّب البيئة كنسخة احتياطية
+  }
+  return authorizeDashboardPassword(password);
 }
 
 const DIRECTORY_GATE_COOKIE = "admin_directory_gate";

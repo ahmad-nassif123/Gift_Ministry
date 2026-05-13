@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getSession,
-  getDirectoryGateCookieValue,
-  verifyDirectoryGateToken,
-} from "@/lib/auth-session";
+import { requireAdminDirectoryGate } from "@/lib/admin-directory-access";
 import {
   deleteAdminAccount,
   hasAdminDirectoryDb,
@@ -11,31 +7,8 @@ import {
   upsertAdminAccount,
 } from "@/lib/admin-directory-db";
 
-async function requireDirectoryAccess(): Promise<
-  | { ok: true }
-  | { ok: false; status: number; body: { success: false; error: string } }
-> {
-  const session = await getSession();
-  if (!session) {
-    return {
-      ok: false,
-      status: 401,
-      body: { success: false, error: "يجب تسجيل الدخول" },
-    };
-  }
-  const gate = await getDirectoryGateCookieValue();
-  if (!verifyDirectoryGateToken(gate)) {
-    return {
-      ok: false,
-      status: 403,
-      body: { success: false, error: "يجب فتح القفل بكلمة المرور أولاً" },
-    };
-  }
-  return { ok: true };
-}
-
 export async function GET() {
-  const gate = await requireDirectoryAccess();
+  const gate = await requireAdminDirectoryGate();
   if (!gate.ok) {
     return NextResponse.json(gate.body, { status: gate.status });
   }
@@ -60,7 +33,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const gate = await requireDirectoryAccess();
+  const gate = await requireAdminDirectoryGate();
   if (!gate.ok) {
     return NextResponse.json(gate.body, { status: gate.status });
   }
@@ -83,7 +56,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const gate = await requireDirectoryAccess();
+  const gate = await requireAdminDirectoryGate();
   if (!gate.ok) {
     return NextResponse.json(gate.body, { status: gate.status });
   }

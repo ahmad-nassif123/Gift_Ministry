@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, KeyRound, Loader2, Lock, Trash2, UserPlus } from "lucide-react";
+import { ArrowRight, KeyRound, Loader2, Lock } from "lucide-react";
 import { DashboardLayout } from "@/app/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,16 +13,15 @@ export function AdminDirectoryClient() {
   const [loading, setLoading] = useState(true);
   const [dbAvailable, setDbAvailable] = useState(false);
   const [gateUnlocked, setGateUnlocked] = useState(false);
+  const [usesDbPassword, setUsesDbPassword] = useState(false);
   const [gateInput, setGateInput] = useState("");
   const [unlocking, setUnlocking] = useState(false);
 
-  const [emails, setEmails] = useState<string[]>([]);
-  const [newEmail, setNewEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const [editEmail, setEditEmail] = useState<string | null>(null);
-  const [editPassword, setEditPassword] = useState("");
+  const [clearing, setClearing] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     setLoading(true);
@@ -32,6 +31,7 @@ export function AdminDirectoryClient() {
         success?: boolean;
         dbAvailable?: boolean;
         gateUnlocked?: boolean;
+        usesDbPassword?: boolean;
       };
       if (!res.ok) {
         notifyError("تعذر التحقق من الجلسة.");
@@ -39,11 +39,7 @@ export function AdminDirectoryClient() {
       }
       setDbAvailable(!!json.dbAvailable);
       setGateUnlocked(!!json.gateUnlocked);
-      if (json.gateUnlocked && json.dbAvailable) {
-        const r2 = await fetch("/api/admin/directory", { credentials: "include" });
-        const j2 = (await r2.json()) as { success?: boolean; emails?: string[] };
-        if (r2.ok && j2.success && Array.isArray(j2.emails)) setEmails(j2.emails);
-      }
+      setUsesDbPassword(!!json.usesDbPassword);
     } catch {
       notifyError("خطأ في الشبكة.");
     } finally {
@@ -85,38 +81,45 @@ export function AdminDirectoryClient() {
       await fetch("/api/admin/directory/lock", { method: "POST", credentials: "include" });
       notifySuccess("تم إغلاق القفل.");
       setGateUnlocked(false);
-      setEmails([]);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
     } catch {
       notifyError("تعذر إغلاق القفل");
     }
   };
 
-  const handleAddOrUpdate = async (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    const email = editEmail ?? newEmail.trim();
-    const password = editEmail ? editPassword.trim() : newPassword.trim();
-    if (!email || !password) {
-      notifyError("أدخل البريد وكلمة المرور.");
+    if (!newPassword.trim() || !confirmPassword.trim()) {
+      notifyError("أدخل كلمة المرور الجديدة وتأكيدها.");
+      return;
+    }
+    if (newPassword.trim() !== confirmPassword.trim()) {
+      notifyError("كلمة المرور الجديدة وتأكيدها غير متطابقين.");
       return;
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/directory", {
+      const res = await fetch("/api/admin/directory/dashboard-password", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          currentPassword,
+          newPassword: newPassword.trim(),
+          confirmPassword: confirmPassword.trim(),
+        }),
       });
       const json = (await res.json()) as { success?: boolean; error?: string };
       if (!res.ok || !json.success) {
-        notifyError(json.error || "فشل الحفظ");
+        notifyError(json.error || "فشل التحديث");
         return;
       }
-      notifySuccess(editEmail ? "تم تحديث كلمة المرور." : "تمت إضافة الحساب.");
-      setNewEmail("");
+      notifySuccess("تم تحديث كلمة مرور الدخول الرئيسية. استخدمها من الآن في صفحة تسجيل الدخول.");
+      setCurrentPassword("");
       setNewPassword("");
-      setEditEmail(null);
-      setEditPassword("");
+      setConfirmPassword("");
       await refreshStatus();
     } catch {
       notifyError("حدث خطأ");
@@ -125,22 +128,31 @@ export function AdminDirectoryClient() {
     }
   };
 
-  const handleDelete = async (email: string) => {
-    if (!confirm(`حذف الحساب ${email} من القاعدة؟`)) return;
+  const handleClearDbPassword = async () => {
+    if (
+      !confirm(
+        "إلغاء كلمة المرور المحفوظة في القاعدة؟ سيعود الدخول ليعتمد على ADMIN_PASSWORD في Vercel فقط (يجب أن يكون مضبوطاً)."
+      )
+    ) {
+      return;
+    }
+    setClearing(true);
     try {
-      const res = await fetch(`/api/admin/directory?email=${encodeURIComponent(email)}`, {
+      const res = await fetch("/api/admin/directory/dashboard-password", {
         method: "DELETE",
         credentials: "include",
       });
       const json = (await res.json()) as { success?: boolean; error?: string };
       if (!res.ok || !json.success) {
-        notifyError(json.error || "فشل الحذف");
+        notifyError(json.error || "فشل الإلغاء");
         return;
       }
-      notifySuccess("تم الحذف.");
+      notifySuccess("تم الإلغاء. الدخول يعتمد الآن على متغيرات البيئة فقط.");
       await refreshStatus();
     } catch {
       notifyError("حدث خطأ");
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -149,9 +161,10 @@ export function AdminDirectoryClient() {
       <div className="container mx-auto max-w-lg px-4 py-8 sm:max-w-xl">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">إدارة حسابات الدخول</h1>
+            <h1 className="text-2xl font-bold">كلمة مرور الدخول الرئيسية</h1>
             <p className="text-sm text-muted-foreground">
-              إضافة وتعديل البريد وكلمة المرور (تُخزَّن مشفّرة في قاعدة البيانات)
+              تغيير كلمة المرور لصفحة تسجيل الدخول إلى لوحة التحكم. عند الحفظ في القاعدة تُستخدم بدل
+              ADMIN_PASSWORD على الاستضافة.
             </p>
           </div>
           <Button variant="outline" asChild>
@@ -173,8 +186,9 @@ export function AdminDirectoryClient() {
                 <CardHeader>
                   <CardTitle className="text-base">قاعدة البيانات غير متوفرة</CardTitle>
                   <CardDescription>
-                    اربط Postgres (POSTGRES_URL أو DATABASE_URL على Vercel). بدون قاعدة بيانات لا تُخزَّن الحسابات من
-                    هذه الصفحة. دخول لوحة التحكم نفسه يعتمد على ADMIN_PASSWORD فقط.
+                    اربط Postgres (POSTGRES_URL أو DATABASE_URL على Vercel) ثم أعد النشر. بدون قاعدة بيانات لا
+                    يمكن حفظ كلمة مرور جديدة من هذه الصفحة؛ يبقى الدخول يعتمد على ADMIN_PASSWORD في الاستضافة
+                    فقط.
                   </CardDescription>
                 </CardHeader>
               </Card>
@@ -188,7 +202,7 @@ export function AdminDirectoryClient() {
                     قفل الحماية
                   </CardTitle>
                   <CardDescription>
-                    أدخل كلمة مرور القفل للمتابعة إلى إدارة الإيميلات وكلمات السر.
+                    أدخل كلمة مرور القفل للمتابعة إلى تغيير كلمة مرور الدخول الرئيسية.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -205,7 +219,11 @@ export function AdminDirectoryClient() {
                       />
                     </div>
                     <Button type="submit" disabled={unlocking || !gateInput.trim()} className="w-full sm:w-auto">
-                      {unlocking ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="ml-2 h-4 w-4" />}
+                      {unlocking ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <KeyRound className="ml-2 h-4 w-4" />
+                      )}
                       فتح القفل
                     </Button>
                   </form>
@@ -213,7 +231,7 @@ export function AdminDirectoryClient() {
               </Card>
             ) : (
               <>
-                <div className="mb-4 flex justify-end">
+                <div className="mb-4 flex flex-wrap justify-end gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => void handleLockAgain()}>
                     <Lock className="ml-2 h-4 w-4" />
                     إغلاق القفل
@@ -221,120 +239,74 @@ export function AdminDirectoryClient() {
                 </div>
 
                 {dbAvailable && (
-                  <>
-                    <Card className="mb-6">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <UserPlus className="h-5 w-5" />
-                          إضافة حساب جديد
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <form onSubmit={handleAddOrUpdate} className="grid gap-3 sm:grid-cols-2">
-                          <Input
-                            type="email"
-                            placeholder="البريد الإلكتروني"
-                            value={newEmail}
-                            onChange={(e) => setNewEmail(e.target.value)}
-                            disabled={!!editEmail}
-                            autoComplete="off"
-                          />
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <KeyRound className="h-5 w-5" />
+                        تغيير كلمة مرور /login
+                      </CardTitle>
+                      <CardDescription>
+                        {usesDbPassword
+                          ? "الدخول حالياً يعتمد على كلمة المرور المحفوظة في القاعدة (وليس على ADMIN_PASSWORD)."
+                          : "الدخول حالياً يعتمد على ADMIN_PASSWORD في Vercel. بعد الحفظ هنا تصبح كلمة المرور من القاعدة هي المعتمدة."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleChangePassword} className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">كلمة المرور الحالية</label>
                           <Input
                             type="password"
-                            placeholder="كلمة المرور"
+                            autoComplete="current-password"
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="ما تستخدمه الآن في تسجيل الدخول"
+                            className="text-base"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">كلمة المرور الجديدة</label>
+                          <Input
+                            type="password"
+                            autoComplete="new-password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            disabled={!!editEmail}
-                            autoComplete="new-password"
+                            placeholder="6 أحرف على الأقل"
+                            className="text-base"
                           />
-                          <div className="sm:col-span-2">
-                            <Button type="submit" disabled={saving || !!editEmail || !newEmail.trim() || !newPassword}>
-                              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "إضافة"}
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">تأكيد كلمة المرور الجديدة</label>
+                          <Input
+                            type="password"
+                            autoComplete="new-password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="أعد إدخال الجديدة"
+                            className="text-base"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="submit"
+                            disabled={saving || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()}
+                          >
+                            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "حفظ كلمة المرور"}
+                          </Button>
+                          {usesDbPassword && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={clearing}
+                              onClick={() => void handleClearDbPassword()}
+                            >
+                              {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : "إلغاء كلمة المرور من القاعدة"}
                             </Button>
-                          </div>
-                        </form>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">الحسابات في القاعدة</CardTitle>
-                        <CardDescription>
-                          الحسابات المعرّفة فقط عبر متغيرات البيئة لا تظهر هنا؛ عدّلها من إعدادات الاستضافة.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {emails.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">لا توجد حسابات مخزّنة بعد.</p>
-                        ) : (
-                          <ul className="space-y-3">
-                            {emails.map((em) => (
-                              <li
-                                key={em}
-                                className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
-                              >
-                                <span className="break-all font-medium">{em}</span>
-                                <div className="flex flex-wrap gap-2">
-                                  {editEmail === em ? (
-                                    <form
-                                      className="flex w-full flex-col gap-2 sm:flex-row sm:items-center"
-                                      onSubmit={handleAddOrUpdate}
-                                    >
-                                      <Input
-                                        type="password"
-                                        placeholder="كلمة المرور الجديدة"
-                                        value={editPassword}
-                                        onChange={(e) => setEditPassword(e.target.value)}
-                                        className="sm:max-w-[200px]"
-                                        autoComplete="new-password"
-                                      />
-                                      <Button type="submit" size="sm" disabled={saving || !editPassword.trim()}>
-                                        حفظ
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          setEditEmail(null);
-                                          setEditPassword("");
-                                        }}
-                                      >
-                                        إلغاء
-                                      </Button>
-                                    </form>
-                                  ) : (
-                                    <>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          setEditEmail(em);
-                                          setEditPassword("");
-                                        }}
-                                      >
-                                        تغيير كلمة المرور
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-destructive hover:text-destructive"
-                                        onClick={() => void handleDelete(em)}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </>
+                          )}
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
                 )}
               </>
             )}

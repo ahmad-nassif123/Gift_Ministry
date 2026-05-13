@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   attachAdminSessionToResponse,
-  authorizeDashboardPassword,
   createSessionToken,
   getDashboardActorEmail,
-  isDashboardLoginConfigured,
+  isDashboardLoginConfiguredAsync,
+  verifyDashboardLoginPassword,
 } from "@/lib/auth-session";
 
 export const dynamic = "force-dynamic";
@@ -15,19 +15,19 @@ export async function POST(request: NextRequest) {
     const password = body.password;
     const pass = typeof password === "string" ? password : "";
 
-    if (!isDashboardLoginConfigured()) {
-      console.error("[auth/login] ADMIN_PASSWORD غير متاح على الخادم (فارغ أو غير مربوط بهذا النشر)");
+    if (!(await isDashboardLoginConfiguredAsync())) {
+      console.error("[auth/login] لا توجد كلمة مرور في البيئة ولا في القاعدة لهذا النشر");
       return NextResponse.json(
         {
           success: false,
           error:
-            "تسجيل الدخول غير مفعّل على الخادم: أضف المتغير ADMIN_PASSWORD في إعدادات المشروع على Vercel (أو اربط المتغير المشترك بالمشروع) ثم نفّذ Redeploy.",
+            "تسجيل الدخول غير مفعّل على الخادم: أضف ADMIN_PASSWORD في Vercel أو عيّن كلمة مرور من صفحة «تغيير كلمة المرور» بعد ربط POSTGRES_URL، ثم نفّذ Redeploy.",
         },
         { status: 503 }
       );
     }
 
-    if (!authorizeDashboardPassword(pass)) {
+    if (!(await verifyDashboardLoginPassword(pass))) {
       return NextResponse.json(
         { success: false, error: "كلمة المرور غير صحيحة" },
         { status: 401 }
