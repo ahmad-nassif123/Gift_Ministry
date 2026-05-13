@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  attachAdminSessionToResponse,
   authorizeDashboardPassword,
   createSessionToken,
   getDashboardActorEmail,
   isDashboardLoginConfigured,
-  setSessionCookie,
 } from "@/lib/auth-session";
 
 export const dynamic = "force-dynamic";
@@ -35,10 +35,10 @@ export async function POST(request: NextRequest) {
     }
 
     const token = createSessionToken(getDashboardActorEmail());
-    await setSessionCookie(token);
-
     const nextUrl = typeof body.next === "string" && body.next.startsWith("/") ? body.next : "/dashboard";
-    return NextResponse.json({ success: true, redirect: nextUrl });
+    const response = NextResponse.json({ success: true, redirect: nextUrl });
+    attachAdminSessionToResponse(response, token);
+    return response;
   } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json(

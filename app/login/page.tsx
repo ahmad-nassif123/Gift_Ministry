@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get("next") ?? "";
   const [password, setPassword] = useState("");
@@ -47,7 +46,8 @@ function LoginForm() {
           typeof data.redirect === "string" && data.redirect.startsWith("/")
             ? data.redirect
             : "/dashboard";
-        router.push(dest);
+        // تحميل كامل يضمن إرسال الكوكي مع الطلب التالي (أوثق من router.push مع الجلسة)
+        window.location.assign(dest);
         return;
       }
       if (res.status === 401) {

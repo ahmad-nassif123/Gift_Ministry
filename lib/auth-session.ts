@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import crypto from "crypto";
 
 const COOKIE_NAME = "admin_session";
@@ -51,15 +52,35 @@ export async function getSession(): Promise<SessionPayload | null> {
   return verifySessionToken(token);
 }
 
-export async function setSessionCookie(token: string): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, token, {
+/** خيارات كوكي الجلسة — مُشارَكة بين Route Handlers والـ Server */
+function adminSessionCookieOptions() {
+  return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     maxAge: MAX_AGE,
     path: "/",
+  };
+}
+
+/**
+ * في Route Handlers يجب ضبط الكوكي على `NextResponse` وليس `cookies().set()` فقط،
+ * وإلا قد لا يُرفق `Set-Cookie` مع الاستجابة (المتصفح لا يخزّن الجلسة).
+ */
+export function attachAdminSessionToResponse(response: NextResponse, token: string): void {
+  response.cookies.set(COOKIE_NAME, token, adminSessionCookieOptions());
+}
+
+export function clearAdminSessionOnResponse(response: NextResponse): void {
+  response.cookies.set(COOKIE_NAME, "", {
+    ...adminSessionCookieOptions(),
+    maxAge: 0,
   });
+}
+
+export async function setSessionCookie(token: string): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(COOKIE_NAME, token, adminSessionCookieOptions());
 }
 
 export async function deleteSessionCookie(): Promise<void> {
