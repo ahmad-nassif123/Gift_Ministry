@@ -69,3 +69,9 @@ export function formatGiftPriceUsdLabel(raw?: string | null): string {
   if (usd > 0) return formatUsdAmount(usd);
   return t;
 }
+
+/** للعرض العام: سعر المبيع إن وُجد، وإلا السعر الأساسي. */
+export function formatCustomerFacingPrice(product: { price?: string; salePrice?: string }): string {
+  const raw = (product.salePrice && String(product.salePrice).trim()) || (product.price && String(product.price).trim()) || "";
+  return formatGiftPriceUsdLabel(raw || null);
+}

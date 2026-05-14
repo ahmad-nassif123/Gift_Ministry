@@ -9,6 +9,10 @@ export interface Product {
   shortDescription: string;
   contents: string[];
   price?: string;
+  /** سعر البيع للعميل (يظهر في الكتالوج إن وُجد؛ وإلا يُعرض `price`). */
+  salePrice?: string;
+  /** ملاحظة تسعير داخلية (مثلاً تفصيل من Excel) — تُعرض في الإدارة فقط. */
+  pricingDetail?: string;
   category?: string;
   giftTier: GiftTier; // تصنيف الهدية: قياسية، مميزة، فاخرة
   images: string[];

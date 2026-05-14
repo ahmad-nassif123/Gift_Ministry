@@ -20,6 +20,8 @@ export async function ensureProductsTable(): Promise<void> {
         catalog_image TEXT,
         available_quantity INTEGER NOT NULL DEFAULT 0,
         price VARCHAR(64),
+        sale_price VARCHAR(64),
+        pricing_detail VARCHAR(512),
         archived BOOLEAN NOT NULL DEFAULT false,
         hidden BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -40,6 +42,16 @@ export async function ensureProductsTable(): Promise<void> {
       await sql`ALTER TABLE products ADD COLUMN catalog_image TEXT`;
     } catch {
       /* العمود موجود مسبقاً */
+    }
+    try {
+      await sql`ALTER TABLE products ADD COLUMN sale_price VARCHAR(64)`;
+    } catch {
+      /* موجود */
+    }
+    try {
+      await sql`ALTER TABLE products ADD COLUMN pricing_detail VARCHAR(512)`;
+    } catch {
+      /* موجود */
     }
     await sql`
       CREATE TABLE IF NOT EXISTS catalog_slug_suppressions (
@@ -66,6 +78,11 @@ function rowToProduct(r: Record<string, unknown>): Product {
     catalogImage: r.catalog_image != null ? String((r as any).catalog_image) : undefined,
     availableQuantity: typeof r.available_quantity === "number" ? r.available_quantity : 0,
     price: r.price != null ? String(r.price) : undefined,
+    salePrice: (r as { sale_price?: unknown }).sale_price != null ? String((r as { sale_price?: unknown }).sale_price) : undefined,
+    pricingDetail:
+      (r as { pricing_detail?: unknown }).pricing_detail != null
+        ? String((r as { pricing_detail?: unknown }).pricing_detail)
+        : undefined,
     archived: Boolean(r.archived),
     hidden: Boolean((r as any).hidden),
     createdAt: r.created_at != null ? String((r as any).created_at) : undefined,
@@ -88,7 +105,7 @@ export async function seedProductsIfEmpty(): Promise<number> {
   for (const p of initialProducts) {
     if (suppressed.has(p.slug)) continue;
     await sql`
-      INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, updated_at)
+      INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, sale_price, pricing_detail, updated_at)
       VALUES (
         ${p.slug},
         ${p.sku},
@@ -100,6 +117,8 @@ export async function seedProductsIfEmpty(): Promise<number> {
         ${p.catalogImage ?? null},
         ${p.availableQuantity ?? 0},
         ${p.price ?? null},
+        ${p.salePrice ?? null},
+        ${p.pricingDetail ?? null},
         NOW()
       )
       ON CONFLICT (slug) DO NOTHING
@@ -119,7 +138,7 @@ export async function syncInitialProducts(): Promise<void> {
   for (const p of initialProducts) {
     if (suppressed.has(p.slug)) continue;
     await sql`
-      INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, updated_at)
+      INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, sale_price, pricing_detail, updated_at)
       VALUES (
         ${p.slug},
         ${p.sku},
@@ -131,6 +150,8 @@ export async function syncInitialProducts(): Promise<void> {
         ${p.catalogImage ?? null},
         ${p.availableQuantity ?? 0},
         ${p.price ?? null},
+        ${p.salePrice ?? null},
+        ${p.pricingDetail ?? null},
         NOW()
       )
       ON CONFLICT (slug) DO NOTHING
@@ -186,7 +207,7 @@ export async function createProduct(p: Product): Promise<Product> {
   await ensureProductsTable();
   await sql`DELETE FROM catalog_slug_suppressions WHERE slug = ${p.slug}`;
   await sql`
-    INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, archived, hidden, updated_at)
+    INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, sale_price, pricing_detail, archived, hidden, updated_at)
     VALUES (
       ${p.slug},
       ${p.sku},
@@ -198,6 +219,8 @@ export async function createProduct(p: Product): Promise<Product> {
       ${p.catalogImage ?? null},
       ${p.availableQuantity ?? 0},
       ${p.price ?? null},
+      ${p.salePrice ?? null},
+      ${p.pricingDetail ?? null},
       ${p.archived ?? false},
       ${p.hidden ?? false},
       NOW()
@@ -206,8 +229,12 @@ export async function createProduct(p: Product): Promise<Product> {
   return p;
 }
 
-/** يتضمّن `price: null` لمسح السعر في القاعدة (لا يُغطّى بـ COALESCE). */
-export type ProductUpdateInput = Omit<Partial<Product>, "price"> & { price?: string | null };
+/** يتضمّن `price` / `salePrice` / `pricingDetail` بقيمة `null` لمسحها في القاعدة. */
+export type ProductUpdateInput = Omit<Partial<Product>, "price" | "salePrice" | "pricingDetail"> & {
+  price?: string | null;
+  salePrice?: string | null;
+  pricingDetail?: string | null;
+};
 
 /**
  * تحديث منتج في جولة شبكة واحدة (بدون SELECT ثم UPDATE) لتقليل زمن الحفظ على Neon/Vercel.
@@ -228,6 +255,14 @@ export async function updateProduct(slug: string, updates: ProductUpdateInput): 
   const setPriceNull = hasPriceKey && updates.price === null;
   const priceCoalesce = hasPriceKey && typeof updates.price === "string" ? updates.price : null;
   const priceClearFlag = setPriceNull ? 1 : 0;
+  const hasSaleKey = Object.prototype.hasOwnProperty.call(updates, "salePrice");
+  const setSaleNull = hasSaleKey && updates.salePrice === null;
+  const saleCoalesce = hasSaleKey && typeof updates.salePrice === "string" ? updates.salePrice : null;
+  const saleClearFlag = setSaleNull ? 1 : 0;
+  const hasDetailKey = Object.prototype.hasOwnProperty.call(updates, "pricingDetail");
+  const setDetailNull = hasDetailKey && updates.pricingDetail === null;
+  const detailCoalesce = hasDetailKey && typeof updates.pricingDetail === "string" ? updates.pricingDetail : null;
+  const detailClearFlag = setDetailNull ? 1 : 0;
   const archived = updates.archived !== undefined ? updates.archived : null;
   const hidden = updates.hidden !== undefined ? updates.hidden : null;
 
@@ -242,6 +277,8 @@ export async function updateProduct(slug: string, updates: ProductUpdateInput): 
       catalog_image = COALESCE(${catalogImage}, p.catalog_image),
       available_quantity = COALESCE(${qty}, p.available_quantity),
       price = CASE WHEN ${priceClearFlag} = 1 THEN NULL ELSE COALESCE(${priceCoalesce}, p.price) END,
+      sale_price = CASE WHEN ${saleClearFlag} = 1 THEN NULL ELSE COALESCE(${saleCoalesce}, p.sale_price) END,
+      pricing_detail = CASE WHEN ${detailClearFlag} = 1 THEN NULL ELSE COALESCE(${detailCoalesce}, p.pricing_detail) END,
       archived = COALESCE(${archived}, p.archived),
       hidden = COALESCE(${hidden}, p.hidden),
       updated_at = NOW()

@@ -17,19 +17,22 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as { slug?: unknown; price?: unknown };
+    const body = (await request.json()) as { slug?: unknown; price?: unknown; salePrice?: unknown; pricingDetail?: unknown };
     const slug = String(body.slug ?? "").trim();
     if (!slug) {
       return NextResponse.json({ success: false, error: "slug مطلوب" }, { status: 400 });
     }
 
-    const raw = body.price;
-    const price: string | null | undefined =
-      raw === undefined || raw === null
-        ? undefined
-        : String(raw).trim() === ""
-          ? null
-          : String(raw).trim();
+    const norm = (raw: unknown): string | null | undefined => {
+      if (raw === undefined) return undefined;
+      if (raw === null) return null;
+      const t = String(raw).trim();
+      return t === "" ? null : t;
+    };
+
+    const price = norm(body.price);
+    const salePrice = norm(body.salePrice);
+    const pricingDetail = norm(body.pricingDetail);
 
     await ensureProductsTable();
     const existing = await getProductBySlug(slug);
@@ -37,7 +40,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "الهدية غير موجودة" }, { status: 404 });
     }
 
-    const updated = await updateProduct(slug, { price: price === undefined ? undefined : price });
+    const updated = await updateProduct(slug, {
+      price: price === undefined ? undefined : price,
+      salePrice: salePrice === undefined ? undefined : salePrice,
+      pricingDetail: pricingDetail === undefined ? undefined : pricingDetail,
+    });
     if (!updated) {
       return NextResponse.json({ success: false, error: "تعذر تحديث السعر" }, { status: 500 });
     }

@@ -70,6 +70,8 @@ export async function POST(request: NextRequest) {
       catalogImage: typeof body.catalogImage === "string" ? body.catalogImage : undefined,
       availableQuantity: body.availableQuantity ?? 0,
       price: body.price,
+      salePrice: typeof body.salePrice === "string" ? body.salePrice : undefined,
+      pricingDetail: typeof body.pricingDetail === "string" ? body.pricingDetail : undefined,
     };
     await ensureProductsTable();
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -137,6 +139,8 @@ export async function PUT(request: NextRequest) {
       catalogImage: body.catalogImage,
       availableQuantity: body.availableQuantity,
       price: body.price,
+      salePrice: body.salePrice,
+      pricingDetail: body.pricingDetail,
       archived: body.archived,
       hidden: body.hidden,
     };

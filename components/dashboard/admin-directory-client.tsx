@@ -6,7 +6,7 @@ import { ArrowRight, KeyRound, Loader2, Lock } from "lucide-react";
 import { DashboardLayout } from "@/app/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 export function AdminDirectoryClient() {
@@ -209,8 +209,7 @@ export function AdminDirectoryClient() {
                   <form onSubmit={handleUnlock} className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">كلمة مرور القفل</label>
-                      <Input
-                        type="password"
+                      <PasswordInput
                         autoComplete="off"
                         value={gateInput}
                         onChange={(e) => setGateInput(e.target.value)}
@@ -255,8 +254,7 @@ export function AdminDirectoryClient() {
                       <form onSubmit={handleChangePassword} className="space-y-4">
                         <div className="space-y-2">
                           <label className="text-sm font-medium">كلمة المرور الحالية</label>
-                          <Input
-                            type="password"
+                          <PasswordInput
                             autoComplete="current-password"
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
@@ -266,8 +264,7 @@ export function AdminDirectoryClient() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">كلمة المرور الجديدة</label>
-                          <Input
-                            type="password"
+                          <PasswordInput
                             autoComplete="new-password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
@@ -277,8 +274,7 @@ export function AdminDirectoryClient() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">تأكيد كلمة المرور الجديدة</label>
-                          <Input
-                            type="password"
+                          <PasswordInput
                             autoComplete="new-password"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}

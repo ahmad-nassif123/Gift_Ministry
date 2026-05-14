@@ -80,6 +80,8 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
         catalogImage: product.catalogImage ?? "",
         availableQuantity: product.availableQuantity || 0,
         price: product.price,
+        salePrice: product.salePrice,
+        pricingDetail: product.pricingDetail,
         archived: product.archived,
       });
     } else {
@@ -336,6 +338,37 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
                 +
               </Button>
             </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium">السعر (مرجعي / تكلفة)</label>
+              <Input
+                value={formData.price ?? ""}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                placeholder="مثال: 175 USD"
+                dir="ltr"
+                className="text-left"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium">سعر المبيع</label>
+              <Input
+                value={formData.salePrice ?? ""}
+                onChange={(e) => setFormData({ ...formData, salePrice: e.target.value })}
+                placeholder="مثال: 200 USD"
+                dir="ltr"
+                className="text-left"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium">تفصيل التسعير (داخلي)</label>
+            <Input
+              value={formData.pricingDetail ?? ""}
+              onChange={(e) => setFormData({ ...formData, pricingDetail: e.target.value })}
+              placeholder="مثال: 65+25"
+            />
           </div>
 
           {/* تصنيف الهدية */}

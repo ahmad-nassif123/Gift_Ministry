@@ -8,7 +8,7 @@ import { consumeOneTimeShareToken } from "@/lib/product-share-db";
 import { getProductBySlug } from "@/lib/products-db";
 import { getGiftTierLabel } from "@/data/products";
 import { generateWhatsAppLink } from "@/lib/whatsapp";
-import { formatGiftPriceUsdLabel } from "@/lib/catalog-price-display";
+import { formatCustomerFacingPrice } from "@/lib/catalog-price-display";
 import { BLUR_DATA_URL } from "@/lib/blur-placeholder";
 
 export const dynamic = "force-dynamic";
@@ -140,7 +140,7 @@ export default async function ShareOneTimePage({
               </p>
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                 <span>كود: {product.sku}</span>
-                {product.price ? <span>{formatGiftPriceUsdLabel(product.price)}</span> : null}
+                {product.salePrice || product.price ? <span>{formatCustomerFacingPrice(product)}</span> : null}
               </div>
               {product.contents?.length ? (
                 <div>

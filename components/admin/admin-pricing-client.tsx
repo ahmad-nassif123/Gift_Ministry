@@ -23,16 +23,34 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useConfirm } from "@/components/confirm-dialog-provider";
 import type { Product } from "@/data/products";
 import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
-import { formatGiftPriceUsdLabel, parseGiftPriceUsdAmount, roundCatalogUsd } from "@/lib/catalog-price-display";
+import { formatCustomerFacingPrice, formatGiftPriceUsdLabel, parseGiftPriceUsdAmount, roundCatalogUsd } from "@/lib/catalog-price-display";
 import { cn } from "@/lib/utils";
 
 const INVOICE_LS_KEY = "admin_pricing_invoice_log_v1";
+
+/** تحويل خلية Excel (رقم أو نص) إلى نص سعر للموقع (افتراضي USD). */
+function normalizeGiftPriceFromExcelCell(raw: unknown): string {
+  if (raw === "" || raw == null) return "";
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return `${raw} USD`;
+  }
+  const s = String(raw)
+    .trim()
+    .replace(/[\u0660-\u0669]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x0660 + 48));
+  if (!s) return "";
+  const n = Number(s.replace(/,/g, "").replace(/\s+/g, ""));
+  if (Number.isFinite(n) && /^[\d.,\s]+$/.test(s.replace(/-/g, ""))) {
+    return `${n} USD`;
+  }
+  return s;
+}
 
 type AdminPricingTab = "gift-list" | "gift-pricing";
 
@@ -198,10 +216,12 @@ export function AdminPricingClient() {
   const [editingLocalId, setEditingLocalId] = useState<string | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<InvoiceHistoryRow | null>(null);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [salePriceDrafts, setSalePriceDrafts] = useState<Record<string, string>>({});
+  const [detailDrafts, setDetailDrafts] = useState<Record<string, string>>({});
   const [savingSlug, setSavingSlug] = useState<string | null>(null);
   const [importingPrices, setImportingPrices] = useState(false);
   const [applyingImportedPrices, setApplyingImportedPrices] = useState(false);
-  const [importedPriceDrafts, setImportedPriceDrafts] = useState<Record<string, string> | null>(null);
+  const [importPendingSlugs, setImportPendingSlugs] = useState<string[] | null>(null);
 
   const [invoiceNo, setInvoiceNo] = useState(() => {
     const d = new Date();
@@ -322,6 +342,24 @@ export function AdminPricingClient() {
       }
       return next;
     });
+    setSalePriceDrafts((prev) => {
+      const next: Record<string, string> = { ...prev };
+      for (const p of products) {
+        if (next[p.slug] === undefined) {
+          next[p.slug] = String(p.salePrice ?? "").trim();
+        }
+      }
+      return next;
+    });
+    setDetailDrafts((prev) => {
+      const next: Record<string, string> = { ...prev };
+      for (const p of products) {
+        if (next[p.slug] === undefined) {
+          next[p.slug] = String(p.pricingDetail ?? "").trim();
+        }
+      }
+      return next;
+    });
   }, [products]);
   const adminSearchLower = adminQuery.trim().toLowerCase();
   const adminSearchResults = useMemo(() => {
@@ -434,12 +472,14 @@ export function AdminPricingClient() {
       const p = bySlug.get(l.slug);
       if (!p) continue;
       const qty = Math.max(0, Math.floor(l.qty ?? 0));
-      const unitUsd = roundCatalogUsd(parseGiftPriceUsdAmount(String(p.price ?? "")));
+      const unitUsd = roundCatalogUsd(
+        parseGiftPriceUsdAmount(String((p.salePrice && p.salePrice.trim()) || p.price || ""))
+      );
       const totalUsd = roundCatalogUsd(unitUsd * qty);
       const unitPriceText =
         unitUsd > 0
           ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-          : String(p.price ?? "").trim() || "—";
+          : String((p.salePrice && p.salePrice.trim()) || p.price || "").trim() || "—";
       lines.push({
         rowKey: l.slug,
         lineKind: "product",
@@ -688,6 +728,8 @@ export function AdminPricingClient() {
         "اسم الهدية": p.name,
         SKU: p.sku,
         السعر: String(priceDrafts[p.slug] ?? p.price ?? "").trim(),
+        "سعر المبيع": String(salePriceDrafts[p.slug] ?? p.salePrice ?? "").trim(),
+        التفصيل: String(detailDrafts[p.slug] ?? p.pricingDetail ?? "").trim(),
         slug: p.slug,
       }));
     if (rows.length === 0) {
@@ -988,6 +1030,8 @@ export function AdminPricingClient() {
     setProducts([]);
     setQuoteLines([]);
     setPriceDrafts({});
+    setSalePriceDrafts({});
+    setDetailDrafts({});
     setSavingSlug(null);
     setCustomNameDraft("");
     setCustomPriceDraft("");
@@ -1005,31 +1049,43 @@ export function AdminPricingClient() {
     const d = new Date();
     setInvoiceNo(`INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`);
     setAdminTab("gift-list");
+    setImportPendingSlugs(null);
     setGateOk(false);
     toast.message("تم الخروج.");
   };
 
-  const saveProductPrice = async (slug: string) => {
-    if (savingSlug) return;
+  const saveProductPrice = async (slug: string, opts?: { silent?: boolean; batch?: boolean }) => {
+    if (savingSlug && !opts?.batch) return;
     setSavingSlug(slug);
     try {
       const draft = (priceDrafts[slug] ?? "").trim();
+      const saleDraft = (salePriceDrafts[slug] ?? "").trim();
+      const detailDraft = (detailDrafts[slug] ?? "").trim();
       const res = await fetch("/api/admin/pricing/product-price", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ slug, price: draft }),
+        body: JSON.stringify({
+          slug,
+          price: draft,
+          salePrice: saleDraft,
+          pricingDetail: detailDraft,
+        }),
       });
       const json = (await res.json()) as { success?: boolean; error?: string; data?: Product };
       if (!res.ok || !json.success || !json.data) {
-        toast.error(json.error || "تعذر حفظ السعر.");
-        return;
+        if (!opts?.silent) toast.error(json.error || "تعذر حفظ السعر.");
+        return false;
       }
       setProducts((prev) => prev.map((p) => (p.slug === slug ? json.data! : p)));
       setPriceDrafts((prev) => ({ ...prev, [slug]: String(json.data!.price ?? "").trim() }));
-      toast.success("تم حفظ السعر.");
+      setSalePriceDrafts((prev) => ({ ...prev, [slug]: String(json.data!.salePrice ?? "").trim() }));
+      setDetailDrafts((prev) => ({ ...prev, [slug]: String(json.data!.pricingDetail ?? "").trim() }));
+      if (!opts?.silent) toast.success("تم حفظ الأسعار.");
+      return true;
     } catch {
-      toast.error("حدث خطأ أثناء حفظ السعر.");
+      if (!opts?.silent) toast.error("حدث خطأ أثناء حفظ السعر.");
+      return false;
     } finally {
       setSavingSlug(null);
     }
@@ -1044,7 +1100,7 @@ export function AdminPricingClient() {
       return;
     }
     setImportingPrices(true);
-    setImportedPriceDrafts(null);
+    setImportPendingSlugs(null);
     try {
       const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
@@ -1062,47 +1118,55 @@ export function AdminPricingClient() {
       }
 
       const bySku = new Map(products.map((p) => [String(p.sku ?? "").trim().toLowerCase(), p.slug] as const));
-      const next: Record<string, string> = {};
-      let matched = 0;
+      const nextPrice: Record<string, string> = {};
+      const nextSale: Record<string, string> = {};
+      const nextDetail: Record<string, string> = {};
+      const touched = new Set<string>();
       let skipped = 0;
 
       for (const r of rows) {
         const slugRaw =
           String(r.slug ?? r.Slug ?? r.SLUG ?? r["Slug"] ?? r["slug"] ?? "").trim();
-        const skuRaw =
-          String(r.SKU ?? r.sku ?? r["SKU"] ?? r["sku"] ?? "").trim();
-        const priceRaw =
-          String(r["السعر"] ?? r.price ?? r.Price ?? r.PRICE ?? r["price"] ?? r["Price"] ?? "").trim();
-
-        const slug = slugRaw;
-        const sku = skuRaw;
-        const price = priceRaw;
+        const skuRaw = String(r.SKU ?? r.sku ?? r["SKU"] ?? r["sku"] ?? "").trim();
+        const priceCell = r["السعر"] ?? r.price ?? r.Price ?? r.PRICE ?? r["price"] ?? r["Price"] ?? "";
+        const saleCell = r["سعر المبيع"] ?? r["سعر المبيع "] ?? r.salePrice ?? r["salePrice"] ?? "";
+        const detailCell = r["التفصيل"] ?? r["التفصيل "] ?? r.pricingDetail ?? r["pricingDetail"] ?? "";
 
         const resolvedSlug =
-          slug ||
-          (sku ? bySku.get(sku.toLowerCase()) : undefined) ||
-          "";
+          slugRaw || (skuRaw ? bySku.get(skuRaw.toLowerCase()) : undefined) || "";
 
-        if (!resolvedSlug || price === "") {
+        if (!resolvedSlug || !bySlug.get(resolvedSlug)) {
           skipped += 1;
           continue;
         }
-        if (!bySlug.get(resolvedSlug)) {
+
+        const priceNorm = normalizeGiftPriceFromExcelCell(priceCell);
+        const saleNorm = normalizeGiftPriceFromExcelCell(saleCell);
+        const detailStr = String(detailCell ?? "").trim();
+
+        if (!priceNorm && !saleNorm && !detailStr) {
           skipped += 1;
           continue;
         }
-        next[resolvedSlug] = price;
-        matched += 1;
+
+        if (priceNorm) nextPrice[resolvedSlug] = priceNorm;
+        if (saleNorm) nextSale[resolvedSlug] = saleNorm;
+        if (detailStr) nextDetail[resolvedSlug] = detailStr;
+        touched.add(resolvedSlug);
       }
 
-      if (matched === 0) {
-        toast.error("لم يتم العثور على صفوف صالحة. تأكد من وجود عمود slug أو SKU وعمود السعر.");
+      if (touched.size === 0) {
+        toast.error(
+          "لم يتم العثور على صفوف صالحة. تأكد من عمود SKU أو slug، وأن أحد أعمدة السعر أو التفصيل غير فارغ."
+        );
         return;
       }
 
-      setImportedPriceDrafts(next);
-      setPriceDrafts((prev) => ({ ...prev, ...next }));
-      toast.success(`تم استيراد ${matched} سعر${matched === 1 ? "" : ""}. تم تجاهل ${skipped} صف.`);
+      setPriceDrafts((prev) => ({ ...prev, ...nextPrice }));
+      setSalePriceDrafts((prev) => ({ ...prev, ...nextSale }));
+      setDetailDrafts((prev) => ({ ...prev, ...nextDetail }));
+      setImportPendingSlugs([...touched]);
+      toast.success(`تم استيراد ${touched.size} صفاً. تم تجاهل ${skipped} صفاً.`);
     } catch (e) {
       console.error(e);
       toast.error("تعذر قراءة ملف Excel.");
@@ -1113,32 +1177,27 @@ export function AdminPricingClient() {
 
   const applyImportedPrices = async () => {
     if (applyingImportedPrices) return;
-    if (!importedPriceDrafts) {
-      toast.message("لم يتم استيراد أسعار بعد.");
-      return;
-    }
-    const slugs = Object.keys(importedPriceDrafts);
-    if (slugs.length === 0) {
-      toast.message("لا توجد أسعار مطابقة للتطبيق.");
+    if (!importPendingSlugs || importPendingSlugs.length === 0) {
+      toast.message("لم يتم استيراد بيانات بعد.");
       return;
     }
     setApplyingImportedPrices(true);
     try {
       let ok = 0;
       let fail = 0;
-      for (const slug of slugs) {
+      for (const slug of importPendingSlugs) {
         try {
-          // نعتمد على priceDrafts التي تم دمجها بالفعل
           // eslint-disable-next-line no-await-in-loop
-          await saveProductPrice(slug);
-          ok += 1;
+          const done = await saveProductPrice(slug, { silent: true, batch: true });
+          if (done) ok += 1;
+          else fail += 1;
         } catch {
           fail += 1;
         }
       }
-      if (fail === 0) toast.success(`تم تحديث ${ok} سعر في الموقع.`);
-      else toast.message(`تم تحديث ${ok} سعر، وفشل ${fail}.`);
-      setImportedPriceDrafts(null);
+      if (fail === 0) toast.success(`تم تحديث ${ok} هدية في الموقع.`);
+      else toast.message(`تم تحديث ${ok} هدية، وفشل ${fail}.`);
+      setImportPendingSlugs(null);
     } finally {
       setApplyingImportedPrices(false);
     }
@@ -1170,12 +1229,10 @@ export function AdminPricingClient() {
                   <label htmlFor="admin-pricing-pass" className="mb-1 block text-sm font-medium">
                     كلمة المرور
                   </label>
-                  <Input
+                  <PasswordInput
                     id="admin-pricing-pass"
-                    type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="min-h-[44px]"
                     autoComplete="current-password"
                     required
                   />
@@ -1567,7 +1624,7 @@ export function AdminPricingClient() {
                                 <div className="font-medium truncate">{p.name}</div>
                                 <div className="mt-1 flex flex-wrap gap-2">
                                   <Badge variant="outline">كود: {p.sku}</Badge>
-                                  <Badge variant="outline">السعر: {formatGiftPriceUsdLabel(String(p.price ?? ""))}</Badge>
+                                  <Badge variant="outline">العرض: {formatCustomerFacingPrice(p)}</Badge>
                                 </div>
                               </div>
                               <Button type="button" onClick={() => addQuoteLine(p.slug)} disabled={already} className="min-h-[44px] shrink-0">
@@ -1754,14 +1811,17 @@ export function AdminPricingClient() {
                   <Package className="h-5 w-5 shrink-0" />
                   قائمة الهدايا والأسعار
                 </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">عرض سريع للأسعار المخزنة بالدولار داخل كل هدية.</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  السعر الأساسي وسعر المبيع والتفصيل (يُعرض التفصيل في الإدارة فقط). في الموقع العام يُعرض سعر المبيع إن وُجد.
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="mb-4 rounded-lg border bg-card p-4 space-y-3">
                   <p className="text-sm font-semibold">استيراد أسعار من Excel</p>
                   <p className="text-xs text-muted-foreground">
-                    يدعم الأعمدة: <span className="font-medium">slug</span> أو <span className="font-medium">SKU</span> + <span className="font-medium">السعر</span>.
-                    (يمكنك استخدام الملف الذي يصدره النظام نفسه.)
+                    يدعم الأعمدة: <span className="font-medium">slug</span> أو <span className="font-medium">SKU</span>، و
+                    <span className="font-medium"> السعر</span> و/أو <span className="font-medium">سعر المبيع</span> و/أو{" "}
+                    <span className="font-medium">التفصيل</span> (مثل ملف التصدير من هنا).
                   </p>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <input
@@ -1779,27 +1839,29 @@ export function AdminPricingClient() {
                       type="button"
                       variant="secondary"
                       className="min-h-[44px] sm:shrink-0"
-                      disabled={!importedPriceDrafts || applyingImportedPrices || savingSlug != null}
+                      disabled={!importPendingSlugs?.length || applyingImportedPrices || savingSlug != null}
                       onClick={() => void applyImportedPrices()}
                     >
                       {applyingImportedPrices ? "جاري التحديث..." : "تطبيق الأسعار على الموقع"}
                     </Button>
                   </div>
-                  {importedPriceDrafts && (
+                  {importPendingSlugs && importPendingSlugs.length > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      جاهز للتطبيق: {Object.keys(importedPriceDrafts).length} سعر.
+                      جاهز للتطبيق: {importPendingSlugs.length} هدية.
                     </p>
                   )}
                 </div>
 
                 <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
-                  <table className="w-full min-w-[760px] text-right text-sm">
+                  <table className="w-full min-w-[1100px] text-right text-sm">
                     <thead className="bg-muted">
                       <tr>
                         <th className="p-3 w-10">#</th>
                         <th className="p-3">الهدية</th>
                         <th className="p-3 w-24">SKU</th>
-                        <th className="p-3 min-w-[220px]">السعر</th>
+                        <th className="p-3 min-w-[140px]">السعر</th>
+                        <th className="p-3 min-w-[140px]">سعر المبيع</th>
+                        <th className="p-3 min-w-[160px]">التفصيل</th>
                         <th className="p-3 w-28">حفظ</th>
                         <th className="p-3 w-28">إضافة للحاسبة</th>
                       </tr>
@@ -1817,7 +1879,23 @@ export function AdminPricingClient() {
                               <Input
                                 value={priceDrafts[p.slug] ?? ""}
                                 onChange={(e) => setPriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
-                                placeholder="مثال: 29.99 USD"
+                                placeholder="مثال: 175 USD"
+                                className="min-h-[44px]"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <Input
+                                value={salePriceDrafts[p.slug] ?? ""}
+                                onChange={(e) => setSalePriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
+                                placeholder="مثال: 200 USD"
+                                className="min-h-[44px]"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <Input
+                                value={detailDrafts[p.slug] ?? ""}
+                                onChange={(e) => setDetailDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
+                                placeholder="مثال: 65+25"
                                 className="min-h-[44px]"
                               />
                             </td>
