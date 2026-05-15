@@ -1772,18 +1772,23 @@ export function AdminPricingClient() {
                   )}
                 </div>
 
+                <p className="mb-2 text-xs text-muted-foreground lg:hidden">
+                  مرّر الجدول أفقياً لرؤية سعر المبيع والتفصيل.
+                </p>
                 <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
-                  <table className="w-full min-w-[1100px] text-right text-sm">
+                  <table className="w-full min-w-[960px] text-right text-sm">
                     <thead className="bg-muted">
                       <tr>
                         <th className="p-3 w-10">#</th>
                         <th className="p-3">الهدية</th>
                         <th className="p-3 w-24">SKU</th>
-                        <th className="p-3 min-w-[140px]">السعر</th>
-                        <th className="p-3 min-w-[140px]">سعر المبيع</th>
-                        <th className="p-3 min-w-[160px]">التفصيل</th>
+                        <th className="p-3 min-w-[130px] bg-brand-green-dark/10 font-semibold text-brand-green-dark">
+                          سعر المبيع
+                        </th>
+                        <th className="p-3 min-w-[130px]">السعر</th>
                         <th className="p-3 w-28">حفظ</th>
                         <th className="p-3 w-28">إضافة للحاسبة</th>
+                        <th className="p-3 min-w-[100px] text-muted-foreground font-normal">التفصيل</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1795,28 +1800,23 @@ export function AdminPricingClient() {
                             <td className="p-3">{i + 1}</td>
                             <td className="p-3 font-medium">{p.name}</td>
                             <td className="p-3">{p.sku}</td>
+                            <td className="p-3 bg-brand-green-dark/5">
+                              <Input
+                                value={salePriceDrafts[p.slug] ?? ""}
+                                onChange={(e) => setSalePriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
+                                placeholder="200 USD"
+                                className="min-h-[44px]"
+                                aria-label={`سعر المبيع ${p.name}`}
+                              />
+                              <span className="mt-0.5 block text-[10px] text-muted-foreground">للموقع</span>
+                            </td>
                             <td className="p-3">
                               <Input
                                 value={priceDrafts[p.slug] ?? ""}
                                 onChange={(e) => setPriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
-                                placeholder="مثال: 175 USD"
+                                placeholder="175 USD"
                                 className="min-h-[44px]"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <Input
-                                value={salePriceDrafts[p.slug] ?? ""}
-                                onChange={(e) => setSalePriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
-                                placeholder="مثال: 200 USD"
-                                className="min-h-[44px]"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <Input
-                                value={detailDrafts[p.slug] ?? ""}
-                                onChange={(e) => setDetailDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
-                                placeholder="مثال: 65+25"
-                                className="min-h-[44px]"
+                                aria-label={`السعر ${p.name}`}
                               />
                             </td>
                             <td className="p-3">
@@ -1845,6 +1845,15 @@ export function AdminPricingClient() {
                               >
                                 <Plus className="ml-2 h-4 w-4" /> إضافة
                               </Button>
+                            </td>
+                            <td className="p-3">
+                              <Input
+                                value={detailDrafts[p.slug] ?? ""}
+                                onChange={(e) => setDetailDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
+                                placeholder="65+25"
+                                className="min-h-[40px] text-xs"
+                                aria-label={`تفصيل ${p.name}`}
+                              />
                             </td>
                           </tr>
                         ))}
