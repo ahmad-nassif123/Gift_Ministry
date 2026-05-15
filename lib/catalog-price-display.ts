@@ -1,7 +1,8 @@
 /**
- * أسعار الكتالوج بالدولار الأمريكي.
- * يُفسَّر النص المخزَّن كقيمة USD، مع دعم تحويل قيم قديمة بليرة عند وجود «ل.س» / «ر.س» / SYP.
- * سعر التحويل للتراث: NEXT_PUBLIC_CATALOG_SYP_PER_USD (افتراضي 15000 ل.س للدولار).
+ * أسعار الكتالوج بالدولار الأمريكي (USD).
+ * يُفسَّر النص المخزَّن كقيمة USD: صريحة بـ USD/$، أو رقم عشري بلا عملة، أو تراث «ل.س» / SYP عند الحاجة للتحويل.
+ * «ر.س» تُزال كنص عملة ويُفسَّر الرقم كدولار (لا تُعامل كليرة).
+ * سعر التحويل للتراث (ل.س فقط): NEXT_PUBLIC_CATALOG_SYP_PER_USD (افتراضي 15000 ل.س للدولار).
  */
 
 function getSypPerUsd(): number {
@@ -14,10 +15,10 @@ function toLatinDigits(s: string): string {
   return s.replace(/[\u0660-\u0669]/g, (ch) => String(ch.charCodeAt(0) - 0x0660));
 }
 
-/** يستخرج قيمة ليرة صحيحة من نص سعر قديم في الكتالوج. */
+/** يستخرج قيمة ليرة صحيحة من نص سعر قديم (ل.س أو SYP فقط). */
 export function parseSypIntegerFromPriceLabel(raw: string): number | null {
   const s = toLatinDigits(String(raw ?? "").trim())
-    .replace(/ل\.س|ر\.س|SYP|syp/gi, " ")
+    .replace(/ل\.س|\bSYP\b|syp/gi, " ")
     .replace(/,/g, "");
   const digits = s.replace(/[^\d]/g, "");
   if (!digits) return null;
@@ -38,20 +39,24 @@ function formatUsdAmount(usd: number): string {
 }
 
 /**
- * يستخرج مبلغ الدولار من نص السعر: قيمة USD صريحة، رقم عشري بلا عملة (يُفسَّر USD)، أو تراث ل.س.
+ * يستخرج مبلغ الدولار من نص السعر: USD صريح، رقم بلا عملة، أو ل.س/SYP (تراث)، أو رقم بعد إزالة «ر.س».
  */
 export function parseGiftPriceUsdAmount(raw: string): number {
   const t = toLatinDigits(String(raw ?? "").trim());
   if (!t) return 0;
   if (/حسب الطلب/i.test(t)) return 0;
   const lower = t.toLowerCase();
-  const hasSypMarker = /ل\.س|ر\.س|\bsyp\b/i.test(lower);
+  const hasSypMarker = /ل\.س|\bsyp\b/i.test(lower);
   if (hasSypMarker) {
     const syp = parseSypIntegerFromPriceLabel(t);
     if (syp == null || syp <= 0) return 0;
     return syp / getSypPerUsd();
   }
-  const usdPortion = t.replace(/\busd\b|\$/gi, "").replace(/\s+/g, "").replace(/,/g, "");
+  const usdPortion = t
+    .replace(/\busd\b|\$/gi, "")
+    .replace(/ر\.س/gi, "")
+    .replace(/\s+/g, "")
+    .replace(/,/g, "");
   const n = Number(usdPortion);
   if (!Number.isFinite(n) || n < 0) return 0;
   return n;

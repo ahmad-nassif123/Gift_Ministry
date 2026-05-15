@@ -115,7 +115,7 @@ function parseStoredInvoice(o: Record<string, unknown>): InvoiceHistoryRow | nul
         unitSyp: ln.unitSyp != null && Number.isFinite(Number(ln.unitSyp)) ? Number(ln.unitSyp) : undefined,
       }))
     : [];
-  const cur = String(o.currency ?? "SYP").toUpperCase() === "USD" ? "USD" : "SYP";
+  const cur = String(o.currency ?? "USD").toUpperCase() === "SYP" ? "SYP" : "USD";
   return {
     id,
     serverId: o.serverId != null ? Number(o.serverId) : undefined,
@@ -233,7 +233,6 @@ export function AdminPricingClient() {
   const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [toSir, setToSir] = useState("");
   const [statement, setStatement] = useState("");
-  const [pdfCurrency, setPdfCurrency] = useState<"SYP" | "USD">("USD");
   const [usdRate, setUsdRate] = useState("15000");
 
   const checkGate = useCallback(async () => {
@@ -287,7 +286,7 @@ export function AdminPricingClient() {
               unitSyp: x.unitSyp != null && Number.isFinite(Number(x.unitSyp)) ? Number(x.unitSyp) : undefined,
             };
           });
-          const cur = String(o.currency ?? "SYP").toUpperCase() === "USD" ? "USD" : "SYP";
+          const cur = String(o.currency ?? "USD").toUpperCase() === "SYP" ? "SYP" : "USD";
           const row: InvoiceHistoryRow = {
             id: `srv-${o.id}`,
             serverId: Number(o.id),
@@ -502,11 +501,6 @@ export function AdminPricingClient() {
       toast.message("أضف هدية واحدة على الأقل للحساب.");
       return;
     }
-    const rate = Number(String(usdRate).replace(/[^\d.]/g, ""));
-    if (pdfCurrency === "SYP" && (!Number.isFinite(rate) || rate <= 0)) {
-      toast.error("أدخل سعر صرف صالح (ليرة سورية للدولار الواحد) لطباعة المستند بالليرة.");
-      return;
-    }
     setQuotePdfLoading(true);
     try {
       const { generateAdminQuoteBlob } = await import("@/lib/admin-quote-pdf");
@@ -527,72 +521,39 @@ export function AdminPricingClient() {
         const unitLabel = "قطعة";
         const unitUsdVal = l.unitUsd;
 
-        if (pdfCurrency === "SYP") {
-          const unitP = Math.max(0, Math.floor(unitUsdVal * rate + 1e-9));
-          const lineVal = unitP * qty;
-          running += lineVal;
-          const sypNum = (v: number) => v.toLocaleString("ar-SA", { numberingSystem: "arab" });
-          const unitPriceText = unitP > 0 ? `${sypNum(unitP)} ل.س` : "—";
-          const lineValueText = unitP > 0 ? `${sypNum(lineVal)} ل.س` : "—";
-          pdfLines.push({
-            sku: l.sku || "—",
-            name: l.name,
-            qty,
-            unit: unitLabel,
-            unitPriceText,
-            lineValueText,
-          });
-          lineSnapshots.push({
-            sku: l.sku || "—",
-            name: l.name,
-            qty,
-            unitPriceText,
-            lineValueText,
-            custom: l.lineKind === "custom",
-            unitUsd: unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : undefined,
-            ...(unitP > 0 ? { unitSyp: unitP } : {}),
-          });
-        } else {
-          const unitUsdRounded = unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : 0;
-          const lineVal = unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal * qty) : 0;
-          running = roundCatalogUsd(running + lineVal);
-          const unitPriceText =
-            unitUsdVal > 0
-              ? `${unitUsdRounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-              : "—";
-          const lineValueText =
-            unitUsdVal > 0
-              ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-              : "—";
-          pdfLines.push({
-            sku: l.sku || "—",
-            name: l.name,
-            qty,
-            unit: unitLabel,
-            unitPriceText,
-            lineValueText,
-          });
-          lineSnapshots.push({
-            sku: l.sku || "—",
-            name: l.name,
-            qty,
-            unitPriceText,
-            lineValueText,
-            custom: l.lineKind === "custom",
-            unitUsd: unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : undefined,
-          });
-        }
+        const unitUsdRounded = unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : 0;
+        const lineVal = unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal * qty) : 0;
+        running = roundCatalogUsd(running + lineVal);
+        const unitPriceText =
+          unitUsdVal > 0
+            ? `${unitUsdRounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+            : "—";
+        const lineValueText =
+          unitUsdVal > 0
+            ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+            : "—";
+        pdfLines.push({
+          sku: l.sku || "—",
+          name: l.name,
+          qty,
+          unit: unitLabel,
+          unitPriceText,
+          lineValueText,
+        });
+        lineSnapshots.push({
+          sku: l.sku || "—",
+          name: l.name,
+          qty,
+          unitPriceText,
+          lineValueText,
+          custom: l.lineKind === "custom",
+          unitUsd: unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : undefined,
+        });
       }
 
-      const grandTotalText =
-        pdfCurrency === "SYP"
-          ? `${Math.floor(running).toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س`
-          : `${roundCatalogUsd(running).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+      const grandTotalText = `${roundCatalogUsd(running).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
-      const currencyNote =
-        pdfCurrency === "SYP"
-          ? `الليرة السورية (تحويل بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`
-          : "الدولار الأمريكي";
+      const currencyNote = "الدولار الأمريكي";
 
       const paymentLabel = paymentTerms === "deferred" ? "مؤجل" : "نقدي";
 
@@ -607,8 +568,8 @@ export function AdminPricingClient() {
         },
         lines: pdfLines,
         grandTotalText,
-        grandNumericForWords: pdfCurrency === "SYP" ? Math.floor(running) : roundCatalogUsd(running),
-        currency: pdfCurrency,
+        grandNumericForWords: roundCatalogUsd(running),
+        currency: "USD",
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -618,7 +579,7 @@ export function AdminPricingClient() {
       a.click();
       URL.revokeObjectURL(url);
 
-      const grandNum = pdfCurrency === "SYP" ? Math.floor(running) : roundCatalogUsd(running);
+      const grandNum = roundCatalogUsd(running);
       const rowId = editingLocalId ?? newCustomLineId();
       const logRow: InvoiceHistoryRow = {
         id: rowId,
@@ -627,8 +588,8 @@ export function AdminPricingClient() {
         documentDateIso: invoiceDate,
         toSir: toSir.trim(),
         statement: statement.trim(),
-        currency: pdfCurrency,
-        usdRate: pdfCurrency === "SYP" ? String(usdRate).trim() : null,
+        currency: "USD",
+        usdRate: null,
         grandTotalText,
         grandNumeric: grandNum,
         linesCount: lineSnapshots.length,
@@ -653,8 +614,8 @@ export function AdminPricingClient() {
               documentDateIso: invoiceDate,
               toSir: toSir.trim(),
               statement: statement.trim(),
-              currency: pdfCurrency,
-              usdRate: pdfCurrency === "SYP" ? String(usdRate).trim() : null,
+              currency: "USD",
+              usdRate: null,
               grandTotalText,
               grandNumeric: grandNum,
               lines: lineSnapshots,
@@ -695,8 +656,8 @@ export function AdminPricingClient() {
             documentDateIso: invoiceDate,
             toSir: toSir.trim(),
             statement: statement.trim(),
-            currency: pdfCurrency,
-            usdRate: pdfCurrency === "SYP" ? String(usdRate).trim() : null,
+            currency: "USD",
+            usdRate: null,
             grandTotalText,
             grandNumeric: grandNum,
             lines: lineSnapshots,
@@ -755,7 +716,6 @@ export function AdminPricingClient() {
     setInvoiceDate(row.documentDateIso ? row.documentDateIso.slice(0, 10) : new Date().toISOString().slice(0, 10));
     setToSir(row.toSir);
     setStatement(row.statement);
-    setPdfCurrency(row.currency);
     if (row.usdRate) setUsdRate(row.usdRate);
     setPaymentTerms(row.paymentTerms);
     const rateNum = row.usdRate != null ? Number(String(row.usdRate).replace(/[^\d.]/g, "")) : NaN;
@@ -802,13 +762,10 @@ export function AdminPricingClient() {
     }
     try {
       const { generateAdminQuoteBlob } = await import("@/lib/admin-quote-pdf");
-      const rate = row.usdRate != null ? Number(String(row.usdRate).replace(/[^\d.]/g, "")) : 0;
       const currencyNote =
         row.currency === "USD"
-          ? Number.isFinite(rate) && rate > 0
-            ? `الدولار الأمريكي (تحويل من الليرة بسعر ${rate.toLocaleString("ar-SA", { numberingSystem: "arab" })} ل.س للدولار الواحد)`
-            : "الدولار الأمريكي"
-          : "الليرة السورية";
+          ? "الدولار الأمريكي"
+          : "سجل أرشيفي — فاتورة بعملة غير الدولار (يُعاد إنشاء PDF كما في السجل)";
       const pdfLines = row.lines.map((l) => ({
         sku: l.sku,
         name: l.name,
@@ -912,9 +869,9 @@ export function AdminPricingClient() {
           { البند: "تاريخ إنشاء التقرير", القيمة: new Date().toLocaleString("ar-SY") },
           { البند: "عدد الفواتير في التقرير", القيمة: list.length },
           { البند: "—", القيمة: "—" },
-          { البند: "إجمالي الليرة السورية — نقدي", القيمة: sypCash },
-          { البند: "إجمالي الليرة السورية — مؤجل", القيمة: sypDef },
-          { البند: "مجموع الليرة السورية (نقدي + مؤجل)", القيمة: sypAll },
+          { البند: "إجمالي فواتير غير USD — نقدي (أرشيف)", القيمة: sypCash },
+          { البند: "إجمالي فواتير غير USD — مؤجل (أرشيف)", القيمة: sypDef },
+          { البند: "مجموع فواتير غير USD (نقدي + مؤجل)", القيمة: sypAll },
           { البند: "—", القيمة: "—" },
           { البند: "إجمالي الدولار — نقدي", القيمة: Number(usdCash.toFixed(4)) },
           { البند: "إجمالي الدولار — مؤجل", القيمة: Number(usdDef.toFixed(4)) },
@@ -924,7 +881,7 @@ export function AdminPricingClient() {
           { البند: "عدد فواتير مؤجل", القيمة: nDef },
           {
             البند: "ملاحظة",
-            القيمة: "لا يُجمَع الدولار مع الليرة في صف واحد دون سعر تحويل — راجع عمود العملة في التفصيل.",
+            القيمة: "الفواتير الجديدة تُسجَّل بالدولار الأمريكي. صفوف «غير USD» للسجلات القديمة فقط.",
           },
         ];
         const detailRows = list.map((inv, i) => ({
@@ -1043,7 +1000,6 @@ export function AdminPricingClient() {
     setPreviewInvoice(null);
     setToSir("");
     setStatement("");
-    setPdfCurrency("USD");
     setUsdRate("15000");
     setInvoiceDate(new Date().toISOString().slice(0, 10));
     const d = new Date();
@@ -1396,7 +1352,7 @@ export function AdminPricingClient() {
                             {row.toSir || "—"}
                           </td>
                           <td className="p-2 tabular-nums text-xs">{row.grandTotalText || "—"}</td>
-                          <td className="p-2">{row.currency === "USD" ? "USD" : "ل.س"}</td>
+                          <td className="p-2">{row.currency === "USD" ? "USD" : "غير USD"}</td>
                           <td className="p-2 text-xs">{row.paymentTerms === "deferred" ? "مؤجل" : "نقدي"}</td>
                           <td className="p-2 text-center tabular-nums">{row.lines.length || row.linesCount}</td>
                           <td className="p-2 text-muted-foreground text-xs">{row.fromDb ? "قاعدة" : "محلي"}</td>
@@ -1530,43 +1486,7 @@ export function AdminPricingClient() {
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">عملة المستند</p>
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="radio"
-                        name="pdf-currency"
-                        className="h-4 w-4"
-                        checked={pdfCurrency === "SYP"}
-                        onChange={() => setPdfCurrency("SYP")}
-                      />
-                      الليرة السورية
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="radio"
-                        name="pdf-currency"
-                        className="h-4 w-4"
-                        checked={pdfCurrency === "USD"}
-                        onChange={() => setPdfCurrency("USD")}
-                      />
-                      الدولار الأمريكي
-                    </label>
-                  </div>
-                  {pdfCurrency === "SYP" && (
-                    <div>
-                      <label htmlFor="usd-rate" className="mb-1 block text-sm text-muted-foreground">
-                        سعر الصرف (ليرة سورية للدولار الواحد) — للتحويل إلى الليرة في المستند
-                      </label>
-                      <Input
-                        id="usd-rate"
-                        inputMode="decimal"
-                        value={usdRate}
-                        onChange={(e) => setUsdRate(e.target.value)}
-                        placeholder="مثال: 15000"
-                        className="min-h-[44px] max-w-xs"
-                      />
-                    </div>
-                  )}
+                  <p className="text-sm font-medium">الدولار الأمريكي (USD) — جميع عروض الأسعار الجديدة بالدولار.</p>
                 </div>
                 <div className="space-y-2 border-t pt-3">
                   <p className="text-sm text-muted-foreground">طريقة السداد (تظهر في PDF وسجل الفواتير)</p>
@@ -1955,7 +1875,7 @@ export function AdminPricingClient() {
                 </div>
                 <div>
                   <span className="text-muted-foreground">العملة </span>
-                  {previewInvoice.currency === "USD" ? "USD" : "ل.س"}
+                  {previewInvoice.currency === "USD" ? "USD" : "غير USD (أرشيف)"}
                 </div>
                 <div>
                   <span className="text-muted-foreground">السداد </span>

@@ -84,7 +84,7 @@ export function mapSourcesToPdfRows(list: InvoiceLogReportSource[]): InvoiceLogR
       invoiceNo: inv.invoiceNo.trim(),
       toSir: inv.toSir.trim(),
       grandTotalText: inv.grandTotalText.trim(),
-      currencyLabel: inv.currency === "USD" ? "دولار" : "ل.س",
+      currencyLabel: inv.currency === "USD" ? "دولار" : "أرشيف",
       paymentLabel: inv.paymentTerms === "deferred" ? "مؤجل" : "نقدي",
       linesCount: Math.max(0, Math.floor(inv.linesCount)),
       sourceLabel: inv.fromDb ? "قاعدة" : "محلي",

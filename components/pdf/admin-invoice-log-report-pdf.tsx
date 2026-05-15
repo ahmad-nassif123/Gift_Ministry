@@ -51,16 +51,21 @@ function parseLooseNumber(raw: string): number | null {
 function formatCurrencyTextAr(raw: string): string {
   const t = String(raw ?? "").trim();
   if (!t) return "—";
-  const isUsd = /\bUSD\b|\$/i.test(t);
-  const isSyp = /ل\.س|ر\.س|\bSYP\b/i.test(t);
+  const isUsd = /\bUSD\b|\$|دولار/i.test(t);
+  const isLegacySyp = /ل\.س|\bSYP\b/i.test(t);
+  const isRiyalLabel = /ر\.س/i.test(t);
   const n = parseLooseNumber(t);
 
   // في مستند RTL من الأفضل وضع اسم العملة أولاً لتجنّب انقسام النص/انقلاب ترتيب الحروف
-  if (isUsd && n != null) return `دولار ${formatArabicIndicDecimal(n)}`;
-  if (isSyp && n != null) return `ل.س ${formatArabicIndicInt(n)}`;
+  if ((isUsd || isRiyalLabel) && n != null) return `دولار ${formatArabicIndicDecimal(n)}`;
+  if (isLegacySyp && n != null) return `أرشيف (ل.س) ${formatArabicIndicInt(n)}`;
+  if (n != null) return `دولار ${formatArabicIndicDecimal(n)}`;
 
-  // تحسين عرض الاختصارات الشائعة إن وُجدت دون القدرة على التحليل
-  return t.replace(/\bUSD\b/gi, "دولار").replace(/\bSYP\b/gi, "ل.س");
+  return t
+    .replace(/\bUSD\b/gi, "دولار")
+    .replace(/ر\.س/gi, "دولار")
+    .replace(/\bSYP\b/gi, "أرشيف")
+    .replace(/ل\.س/gi, "أرشيف");
 }
 
 function normalizeArDateTimeLabel(s: string): string {
@@ -327,7 +332,7 @@ export function InvoiceLogReportPDF({
   const usdAll = summary.usdCash + summary.usdDeferred;
 
   const fmtUsd = (n: number) => `دولار ${formatArabicIndicDecimal(n)}`;
-  const fmtSyp = (n: number) => `ل.س ${formatArabicIndicInt(n)}`;
+  const fmtArchive = (n: number) => `أرشيف (ل.س) ${formatArabicIndicInt(n)}`;
 
   return (
     <Document>
@@ -347,24 +352,24 @@ export function InvoiceLogReportPDF({
                     value={`${formatArabicIndicInt(summary.nCash)} / ${formatArabicIndicInt(summary.nDeferred)}`}
                   />
                   <SummaryStat
-                    label="إجمالي الليرة السورية — نقدي"
-                    value={fmtSyp(summary.sypCash)}
+                    label="فواتير أرشيفية (ل.س) — نقدي"
+                    value={fmtArchive(summary.sypCash)}
                   />
                   <SummaryStat
-                    label="إجمالي الليرة السورية — مؤجل"
-                    value={fmtSyp(summary.sypDeferred)}
+                    label="فواتير أرشيفية (ل.س) — مؤجل"
+                    value={fmtArchive(summary.sypDeferred)}
                   />
                 </View>
                 <View style={styles.summaryRow}>
-                  <SummaryStat label="مجموع الليرة السورية" value={fmtSyp(sypAll)} />
+                  <SummaryStat label="مجموع الفواتير الأرشيفية (ل.س)" value={fmtArchive(sypAll)} />
                   <SummaryStat label="إجمالي الدولار — نقدي" value={fmtUsd(summary.usdCash)} />
                   <SummaryStat label="إجمالي الدولار — مؤجل" value={fmtUsd(summary.usdDeferred)} />
                   <SummaryStat label="مجموع الدولار الأمريكي" value={fmtUsd(usdAll)} />
                 </View>
                 <View style={styles.noteWrap}>
                   <Text style={styles.note}>
-                    ملاحظة: يُحسب كل صف حسب عملة الفاتورة كما وردت في السجل. لا تُدمج الليرة مع الدولار في صف
-                    واحد. الأرقام المعروضة هي نفسها المحفوظة في السجل لحظة إنشاء هذا التقرير.
+                    ملاحظة: الفواتير الجديدة بالدولار الأمريكي. صفوف «أرشيف» للسجلات القديمة بعملة ل.س فقط.
+                    الأرقام كما حُفظت في السجل لحظة إنشاء التقرير.
                   </Text>
                 </View>
               </View>

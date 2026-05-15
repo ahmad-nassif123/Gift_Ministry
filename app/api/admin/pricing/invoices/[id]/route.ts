@@ -85,7 +85,7 @@ export async function PATCH(request: NextRequest, context: { params: { id: strin
         : String(body.documentDateIso).trim().slice(0, 32) || null;
     const toSir = String(body.toSir ?? "").trim().slice(0, 4000);
     const statement = String(body.statement ?? "").trim().slice(0, 8000);
-    const currency = String(body.currency ?? "SYP").toUpperCase() === "USD" ? "USD" : "SYP";
+    const currency = String(body.currency ?? "USD").toUpperCase() === "SYP" ? "SYP" : "USD";
     const usdRate =
       currency === "USD" && body.usdRate != null && String(body.usdRate).trim() !== ""
         ? String(body.usdRate).trim().slice(0, 64)
