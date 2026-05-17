@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type Product, getGiftTierLabel } from "@/data/products";
 import { BLUR_DATA_URL } from "@/lib/blur-placeholder";
-import { formatCustomerFacingPrice, formatGiftPriceUsdLabel } from "@/lib/catalog-price-display";
+import { formatCustomerFacingPrice } from "@/lib/catalog-price-display";
 
 export function ProductListItem({
   product,
@@ -61,12 +61,7 @@ export function ProductListItem({
                 {isOnRecommendation ? " · على التوصية" : ""}
               </p>
               {product.salePrice || product.price ? (
-                <div className="mt-1 space-y-0.5">
-                  <p className="text-sm font-semibold text-brand-green-dark">{formatCustomerFacingPrice(product)}</p>
-                  {product.salePrice && product.price ? (
-                    <p className="text-xs text-muted-foreground">المرجعي: {formatGiftPriceUsdLabel(product.price)}</p>
-                  ) : null}
-                </div>
+                <p className="mt-1 text-sm font-semibold text-brand-green-dark">{formatCustomerFacingPrice(product)}</p>
               ) : null}
             </div>
 

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Product, getGiftTierLabel } from "@/data/products";
 import { generateWhatsAppLink } from "@/lib/whatsapp";
 import { BLUR_DATA_URL } from "@/lib/blur-placeholder";
-import { formatCustomerFacingPrice, formatGiftPriceUsdLabel } from "@/lib/catalog-price-display";
+import { formatCustomerFacingPrice } from "@/lib/catalog-price-display";
 
 interface ProductCardProps {
   product: Product;
@@ -110,16 +110,9 @@ export function ProductCard({ product, index = 0, onAddToOrder, onQuickView }: P
             </div>
           </div>
           {product.salePrice || product.price ? (
-            <div className="mb-1 space-y-0.5 sm:mb-2">
-              <p className="text-sm font-semibold text-brand-green-dark sm:text-base">
-                {formatCustomerFacingPrice(product)}
-              </p>
-              {product.salePrice && product.price ? (
-                <p className="text-[11px] text-muted-foreground sm:text-xs">
-                  السعر المرجعي: {formatGiftPriceUsdLabel(product.price)}
-                </p>
-              ) : null}
-            </div>
+            <p className="mb-1 text-sm font-semibold text-brand-green-dark sm:mb-2 sm:text-base">
+              {formatCustomerFacingPrice(product)}
+            </p>
           ) : null}
           <p className="mb-2 line-clamp-2 text-xs text-muted-foreground sm:mb-3 sm:text-base">
             {product.shortDescription}
