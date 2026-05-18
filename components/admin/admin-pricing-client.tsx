@@ -207,6 +207,7 @@ export function AdminPricingClient() {
   const [loadingProducts, setLoadingProducts] = useState(false);
 
   const [adminQuery, setAdminQuery] = useState("");
+  const [giftListQuery, setGiftListQuery] = useState("");
   const [quoteLines, setQuoteLines] = useState<QuoteLine[]>([]);
   const [quotePdfLoading, setQuotePdfLoading] = useState(false);
   const [customNameDraft, setCustomNameDraft] = useState("");
@@ -376,6 +377,17 @@ export function AdminPricingClient() {
     }
     return out;
   }, [products, adminSearchLower]);
+
+  const giftListQueryLower = giftListQuery.trim().toLowerCase();
+  const giftListFiltered = useMemo(() => {
+    const base = products.filter((p) => !p.archived);
+    if (!giftListQueryLower) return base;
+    return base.filter((p) => {
+      const hay = `${p.name} ${p.sku} ${p.slug}`.toLowerCase();
+      return hay.includes(giftListQueryLower);
+    });
+  }, [products, giftListQueryLower]);
+  const giftListTableRows = useMemo(() => giftListFiltered.slice(0, 200), [giftListFiltered]);
 
   const addQuoteLine = (slug: string) => {
     setQuoteLines((prev) => {
@@ -1775,6 +1787,30 @@ export function AdminPricingClient() {
                   )}
                 </div>
 
+                <div className="relative mb-4">
+                  <Search className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="بحث عن هدية (الاسم أو SKU)..."
+                    value={giftListQuery}
+                    onChange={(e) => setGiftListQuery(e.target.value)}
+                    className="min-h-[44px] pr-10 text-base"
+                    aria-label="بحث في قائمة الهدايا والأسعار"
+                  />
+                  {giftListQuery.trim() !== "" && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute left-1 top-1/2 h-9 w-9 -translate-y-1/2"
+                      onClick={() => setGiftListQuery("")}
+                      aria-label="مسح البحث"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
                 <p className="mb-2 text-xs text-muted-foreground lg:hidden">
                   مرّر الجدول أفقياً لرؤية سعر المبيع والتفصيل.
                 </p>
@@ -1795,10 +1831,16 @@ export function AdminPricingClient() {
                       </tr>
                     </thead>
                     <tbody>
-                      {products
-                        .filter((p) => !p.archived)
-                        .slice(0, 200)
-                        .map((p, i) => (
+                      {giftListTableRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                            {giftListQuery.trim()
+                              ? "لا توجد هدية تطابق البحث."
+                              : "لا توجد هدايا للعرض."}
+                          </td>
+                        </tr>
+                      ) : (
+                        giftListTableRows.map((p, i) => (
                           <tr key={p.slug} className="border-t">
                             <td className="p-3">{i + 1}</td>
                             <td className="p-3 font-medium">{p.name}</td>
@@ -1811,7 +1853,6 @@ export function AdminPricingClient() {
                                 className="min-h-[44px]"
                                 aria-label={`سعر المبيع ${p.name}`}
                               />
-                              <span className="mt-0.5 block text-[10px] text-muted-foreground">للموقع</span>
                             </td>
                             <td className="p-3">
                               <Input
@@ -1859,13 +1900,23 @@ export function AdminPricingClient() {
                               />
                             </td>
                           </tr>
-                        ))}
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  تم عرض أول 200 هدية فقط لتجنب البطء. زر «إضافة» ينقلك إلى تبويب تسعير الهدايا ويضيف الهدية للحاسبة. يمكنك أيضاً
-                  استخدام البحث هناك لإضافة أي هدية.
+                  {giftListQuery.trim() ? (
+                    <>
+                      نتائج البحث: {giftListFiltered.length} هدية
+                      {giftListFiltered.length > 200 ? " (يُعرض أول 200)" : ""}.
+                    </>
+                  ) : giftListFiltered.length > 200 ? (
+                    <>يُعرض أول 200 من {giftListFiltered.length} هدية. استخدم البحث أعلاه للوصول السريع.</>
+                  ) : (
+                    <>{giftListFiltered.length} هدية. استخدم البحث أعلاه للوصول السريع.</>
+                  )}{" "}
+                  زر «إضافة» ينقلك إلى تبويب تسعير الهدايا.
                 </p>
               </CardContent>
             </Card>
