@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 400,
     color: COLORS.gray700,
-    direction: "ltr",
+    direction: "rtl",
     textAlign: "right",
     lineHeight: 1.55,
   },

@@ -7,7 +7,7 @@ const hundreds = [
   "",
   "مائة",
   "مائتان",
-  "ثلاث مائة",
+  "ثلاثة مائة",
   "أربع مائة",
   "خمس مائة",
   "ست مائة",
@@ -61,7 +61,7 @@ function belowThousand(n: number): string {
 const THOUSANDS_1_TO_10: Record<number, string> = {
   1: "ألف",
   2: "ألفان",
-  3: "ثلاث آلاف",
+  3: "ثلاثة آلاف",
   4: "أربعة آلاف",
   5: "خمسة آلاف",
   6: "ستة آلاف",
@@ -74,7 +74,7 @@ const THOUSANDS_1_TO_10: Record<number, string> = {
 const MILLIONS_1_TO_10: Record<number, string> = {
   1: "مليون",
   2: "مليونان",
-  3: "ثلاث ملايين",
+  3: "ثلاثة ملايين",
   4: "أربعة ملايين",
   5: "خمسة ملايين",
   6: "ستة ملايين",
