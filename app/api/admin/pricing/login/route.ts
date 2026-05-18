@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "تسجيل الدخول غير مفعّل على الخادم.",
+          error:
+            "تسجيل الدخول غير مفعّل: أضف ADMIN_PRICING_PASSWORD في Vercel (أو Redeploy بعد ضبطه).",
         },
         { status: 503 }
       );
