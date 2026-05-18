@@ -2,6 +2,7 @@
 
 import { Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
 import { grandTotalInArabicWords } from "@/lib/arabic-number-words";
+import { formatWesternGroupedInteger, formatWesternUsdAmount } from "@/lib/format-western-number";
 
 const fontBase =
   typeof window !== "undefined" ? `${window.location.origin}/fonts/tajawal` : "/fonts/tajawal";
@@ -27,12 +28,6 @@ const COLORS = {
   gray200: "#e5e7eb",
   gray700: "#374151",
 };
-
-/** أرقام عربية شرقية (٠١٢…) — متسقة مع بقية نص PDF وبدون كتلة LTR منفصلة. */
-function formatArabicIndicInt(n: number, grouping = true): string {
-  const v = Math.max(0, Math.floor(Number.isFinite(n) ? n : 0));
-  return v.toLocaleString("ar-SA", { numberingSystem: "arab", useGrouping: grouping });
-}
 
 const styles = StyleSheet.create({
   page: {
@@ -87,22 +82,6 @@ const styles = StyleSheet.create({
     fontWeight: 900,
     color: COLORS.gold,
     textAlign: "center",
-  },
-  /** microtext داخل إطار رفيع أسفل الجدول. */
-  microLineBox: {
-    marginTop: 6,
-    paddingTop: 2,
-    paddingBottom: 1,
-    borderTopWidth: 1,
-    borderTopColor: "#d9e2df",
-  },
-  microLineText: {
-    fontFamily: "Tajawal",
-    fontSize: 5.2,
-    color: COLORS.primary,
-    opacity: 0.35,
-    textAlign: "right",
-    lineHeight: 1.1,
   },
   /** ترويسة المستند */
   letterhead: {
@@ -361,15 +340,13 @@ export function AdminQuotePDF({
 }) {
   const words = grandTotalInArabicWords(grandNumericForWords, currency);
   const n = Number.isFinite(grandNumericForWords) ? Math.max(0, grandNumericForWords) : 0;
-  const figuresAmountSyp = `${formatArabicIndicInt(Math.floor(n))} ل.س`;
-  const figuresAmountUsd = `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  const figuresAmountSyp = `${formatWesternGroupedInteger(Math.floor(n))} ل.س`;
+  const figuresAmountUsd = `${formatWesternUsdAmount(n)} USD`;
 
   const baseSeal = "قسم الانتاج الفني — أصل صادر من النظام — غير صالح للتعديل اليدوي";
   const baseSealDots = "قسم انتاج الفني . أصل صادر من النظام . غير صالح للتعديل اليدوي .";
   const inv = (meta.invoiceNo || "—").trim();
   const dt = (meta.documentDateStr || "").trim();
-  const microFrag = `${dt} | ${baseSeal} | ${inv} | `;
-  const microLine = Array.from({ length: 6 }, () => microFrag.repeat(6)).join("");
   const bgFrag = `${baseSealDots} ${baseSealDots} ${inv ? `${inv} . ` : ""}${dt ? `${dt} .` : ""}`;
   const bgBody = Array.from({ length: 22 }, () => bgFrag).join("\n");
 
@@ -436,7 +413,7 @@ export function AdminQuotePDF({
           {lines.map((l, i) => {
             const rowStyle = i % 2 === 1 ? [styles.tr, styles.trEven] : styles.tr;
             const q = Math.max(0, Math.floor(Number.isFinite(l.qty) ? l.qty : 0));
-            const qtyText = currency === "SYP" ? formatArabicIndicInt(q, false) : String(q);
+            const qtyText = formatWesternGroupedInteger(q, false);
             return (
               <View key={`${i}-${l.sku}-${l.name}-${q}`} style={rowStyle}>
                 <Text style={[styles.td, { width: col.sku }]}>{l.sku || "—"}</Text>
@@ -450,10 +427,6 @@ export function AdminQuotePDF({
           })}
         </View>
 
-        <View style={styles.microLineBox}>
-          <Text style={styles.microLineText}>{microLine}</Text>
-        </View>
-
         <View style={styles.totalsRow}>
           <Text style={styles.totalsLabel}>المجموع النهائي</Text>
           <Text style={styles.totalsValue}>{grandTotalText}</Text>
@@ -463,16 +436,9 @@ export function AdminQuotePDF({
           <Text style={styles.wordsLabel}>المبلغ كتابة</Text>
           <Text style={styles.wordsText}>{words}</Text>
           <View style={styles.figuresTitleRow}>
-            {currency === "SYP" ? (
-              <>
-                <Text style={styles.figuresLabelText}>رقماً</Text>
-                <Text style={styles.figuresAmountText}>{figuresAmountSyp}</Text>
-              </>
-            ) : (
-              <Text style={styles.figuresAmountText}>
-                {`${figuresAmountUsd} رقماً`}
-              </Text>
-            )}
+            <Text style={styles.figuresAmountText}>
+              {currency === "SYP" ? `${figuresAmountSyp} — رقماً` : `${figuresAmountUsd} — رقماً`}
+            </Text>
           </View>
         </View>
 

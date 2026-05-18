@@ -45,19 +45,42 @@ function belowThousand(n: number): string {
   return `${hPart} و${rPart}`;
 }
 
+/** عبارات جاهزة (كلمة واحدة في PDF) لتفادي مشاكل خط Tajawal مع «ثلاثة» وغيرها. */
+const THOUSANDS_1_TO_10: Record<number, string> = {
+  1: "ألف",
+  2: "ألفان",
+  3: "ثلاث آلاف",
+  4: "أربعة آلاف",
+  5: "خمسة آلاف",
+  6: "ستة آلاف",
+  7: "سبعة آلاف",
+  8: "ثمانية آلاف",
+  9: "تسعة آلاف",
+  10: "عشرة آلاف",
+};
+
+const MILLIONS_1_TO_10: Record<number, string> = {
+  1: "مليون",
+  2: "مليونان",
+  3: "ثلاث ملايين",
+  4: "أربعة ملايين",
+  5: "خمسة ملايين",
+  6: "ستة ملايين",
+  7: "سبعة ملايين",
+  8: "ثمانية ملايين",
+  9: "تسعة ملايين",
+  10: "عشرة ملايين",
+};
+
 function formatThousandsGroup(n: number): string {
   if (n === 0) return "";
-  if (n === 1) return "ألف";
-  if (n === 2) return "ألفان";
-  if (n >= 3 && n <= 10) return `${belowThousand(n)} آلاف`;
+  if (n >= 1 && n <= 10) return THOUSANDS_1_TO_10[n] ?? "";
   return `${belowThousand(n)} ألفاً`;
 }
 
 function formatMillionsGroup(n: number): string {
   if (n === 0) return "";
-  if (n === 1) return "مليون";
-  if (n === 2) return "مليونان";
-  if (n >= 3 && n <= 10) return `${belowThousand(n)} ملايين`;
+  if (n >= 1 && n <= 10) return MILLIONS_1_TO_10[n] ?? "";
   return `${belowThousand(n)} مليوناً`;
 }
 
