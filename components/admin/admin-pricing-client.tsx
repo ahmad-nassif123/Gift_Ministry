@@ -30,12 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useConfirm } from "@/components/confirm-dialog-provider";
 import type { Product } from "@/data/products";
 import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
-import {
-  pricingGateHint,
-  pricingGateTitle,
-  PRICING_PASSWORD_ENV,
-  LOGIN_PASSWORD_ENV,
-} from "@/lib/admin-auth-help";
+import { pricingGateTitle, PRICING_PASSWORD_ENV } from "@/lib/admin-auth-help";
 import {
   buildPricingExcelExportRows,
   formatPricingExcelWorksheet,
@@ -1202,13 +1197,12 @@ export function AdminPricingClient() {
                 <Calculator className="h-5 w-5" />
                 {pricingGateTitle}
               </CardTitle>
-              <p className="text-sm text-muted-foreground leading-relaxed">{pricingGateHint}</p>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
                   <label htmlFor="admin-pricing-pass" className="mb-1 block text-sm font-medium">
-                    كلمة المرور ({PRICING_PASSWORD_ENV})
+                    كلمة المرور
                   </label>
                   <PasswordInput
                     id="admin-pricing-pass"
@@ -1221,17 +1215,14 @@ export function AdminPricingClient() {
                 <Button type="submit" className="min-h-[44px] w-full" disabled={loggingIn}>
                   {loggingIn ? "جاري الدخول..." : "دخول"}
                 </Button>
-                <p className="text-center text-sm text-muted-foreground space-y-1">
-                  <span className="block">
-                    <Link href="/login" className="underline hover:text-foreground">
-                      لوحة التحكم ({LOGIN_PASSWORD_ENV})
-                    </Link>
-                  </span>
-                  <span className="block">
-                    <Link href="/" className="underline hover:text-foreground">
-                      العودة للرئيسية
-                    </Link>
-                  </span>
+                <p className="text-center text-sm text-muted-foreground">
+                  <Link href="/login" className="underline hover:text-foreground">
+                    لوحة التحكم
+                  </Link>
+                  <span className="mx-2 text-muted-foreground/60">·</span>
+                  <Link href="/" className="underline hover:text-foreground">
+                    العودة للرئيسية
+                  </Link>
                 </p>
               </form>
             </CardContent>
