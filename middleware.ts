@@ -4,7 +4,7 @@ import { isValidStaffSessionToken } from "@/lib/staff-session-edge";
 
 const STAFF_COOKIE_NAME = "staff_session";
 
-const STAFF_PUBLIC_PATHS = ["/staff/login"];
+const STAFF_PUBLIC_PATHS = ["/staff/login", "/staff/manifest.webmanifest"];
 const STAFF_PUBLIC_API = ["/api/staff/login"];
 
 function isStaticAsset(pathname: string): boolean {

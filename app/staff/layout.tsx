@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
+import { staffPortalMetadata } from "@/lib/staff-portal-metadata";
 
-export const metadata: Metadata = {
-  title: "تسجيل أعمال الموظفين",
-  robots: { index: false, follow: false },
-};
+export const metadata: Metadata = staffPortalMetadata();
 
 /** بوابة معزولة — بدون شريط الموقع أو روابط الكتالوج */
 export default function StaffPortalLayout({ children }: { children: React.ReactNode }) {
