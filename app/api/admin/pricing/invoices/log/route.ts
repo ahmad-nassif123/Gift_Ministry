@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const statement = String(body.statement ?? "").trim().slice(0, 8000);
     const currency = String(body.currency ?? "USD").toUpperCase() === "SYP" ? "SYP" : "USD";
     const usdRate =
-      currency === "USD" && body.usdRate != null && String(body.usdRate).trim() !== ""
+      body.usdRate != null && String(body.usdRate).trim() !== ""
         ? String(body.usdRate).trim().slice(0, 64)
         : null;
     const grandTotalText = String(body.grandTotalText ?? "").trim().slice(0, 512);

@@ -35,10 +35,21 @@ import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
 import { pricingGateTitle } from "@/lib/admin-auth-help";
 import {
   buildPricingExcelExportRows,
+  buildProductSlugByExactSku,
+  extractSkuFromPricingExcelRow,
   formatPricingExcelWorksheet,
   PRICING_EXCEL_HEADERS,
 } from "@/lib/admin-pricing-excel";
-import { formatCustomerFacingPrice, formatGiftPriceUsdLabel, parseGiftPriceUsdAmount, roundCatalogUsd } from "@/lib/catalog-price-display";
+import {
+  formatCustomerFacingPrice,
+  formatDocumentSypInteger,
+  formatGiftPriceUsdLabel,
+  getCatalogSypPerUsd,
+  parseDocumentSypAmount,
+  parseGiftPriceUsdAmount,
+  roundCatalogUsd,
+  usdAmountToDocumentSyp,
+} from "@/lib/catalog-price-display";
 import { cn } from "@/lib/utils";
 
 const INVOICE_LS_KEY = "admin_pricing_invoice_log_v1";
@@ -179,9 +190,24 @@ function removeLocalInvoice(id: string): void {
   writeLocalInvoiceHistory(prev.filter((x) => x.id !== id));
 }
 
+type DocumentCurrency = "SYP" | "USD";
+
 function formatUsdCalculatorDisplay(n: number): string {
   const v = roundCatalogUsd(Math.max(0, n));
   return `${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+}
+
+function formatSypCalculatorDisplay(n: number): string {
+  return formatDocumentSypInteger(n);
+}
+
+function parseSypPerUsdInput(raw: string): number {
+  const n = Number(String(raw).replace(/[^\d.]/g, ""));
+  return Number.isFinite(n) && n > 0 ? n : getCatalogSypPerUsd();
+}
+
+function documentCurrencyNote(currency: DocumentCurrency): string {
+  return currency === "SYP" ? "الليرة السورية الجديدة (ل.س)" : "الدولار الأمريكي";
 }
 
 function formatInvoiceDateAr(isoYmd: string): string {
@@ -243,7 +269,8 @@ export function AdminPricingClient() {
   const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [toSir, setToSir] = useState("");
   const [statement, setStatement] = useState("");
-  const [usdRate, setUsdRate] = useState("15000");
+  const [documentCurrency, setDocumentCurrency] = useState<DocumentCurrency>("USD");
+  const [usdRate, setUsdRate] = useState(() => String(getCatalogSypPerUsd()));
 
   const checkGate = useCallback(async () => {
     try {
@@ -462,7 +489,10 @@ export function AdminPricingClient() {
     setQuoteLines((prev) => prev.map((x) => (x.kind === "custom" && x.id === id ? { ...x, unitPriceInput } : x)));
   };
 
+  const sypPerUsd = useMemo(() => parseSypPerUsdInput(usdRate), [usdRate]);
+
   const quoteComputed = useMemo(() => {
+    const isSyp = documentCurrency === "SYP";
     type Computed = {
       rowKey: string;
       lineKind: "product" | "custom";
@@ -472,17 +502,22 @@ export function AdminPricingClient() {
       name: string;
       unitPriceText: string;
       unitUsd: number;
+      unitSyp: number;
       qty: number;
-      totalUsd: number;
+      lineTotal: number;
     };
     const lines: Computed[] = [];
     for (const l of quoteLines) {
       if (l.kind === "custom") {
         const qty = Math.max(0, Math.floor(l.qty ?? 0));
-        const unitUsd = roundCatalogUsd(parseGiftPriceUsdAmount(l.unitPriceInput));
-        const totalUsd = roundCatalogUsd(unitUsd * qty);
-        const unitPriceText =
-          unitUsd > 0
+        const unitUsd = isSyp ? 0 : roundCatalogUsd(parseGiftPriceUsdAmount(l.unitPriceInput));
+        const unitSyp = isSyp ? parseDocumentSypAmount(l.unitPriceInput) : 0;
+        const lineTotal = isSyp ? unitSyp * qty : roundCatalogUsd(unitUsd * qty);
+        const unitPriceText = isSyp
+          ? unitSyp > 0
+            ? formatDocumentSypInteger(unitSyp)
+            : l.unitPriceInput.trim() || "—"
+          : unitUsd > 0
             ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
             : l.unitPriceInput.trim() || "—";
         lines.push({
@@ -493,8 +528,9 @@ export function AdminPricingClient() {
           name: l.name.trim() || "بند يدوي",
           unitPriceText,
           unitUsd,
+          unitSyp,
           qty,
-          totalUsd,
+          lineTotal,
         });
         continue;
       }
@@ -504,9 +540,13 @@ export function AdminPricingClient() {
       const unitUsd = roundCatalogUsd(
         parseGiftPriceUsdAmount(String((p.salePrice && p.salePrice.trim()) || p.price || ""))
       );
-      const totalUsd = roundCatalogUsd(unitUsd * qty);
-      const unitPriceText =
-        unitUsd > 0
+      const unitSyp = isSyp ? usdAmountToDocumentSyp(unitUsd, sypPerUsd) : 0;
+      const lineTotal = isSyp ? unitSyp * qty : roundCatalogUsd(unitUsd * qty);
+      const unitPriceText = isSyp
+        ? unitSyp > 0
+          ? formatDocumentSypInteger(unitSyp)
+          : String((p.salePrice && p.salePrice.trim()) || p.price || "").trim() || "—"
+        : unitUsd > 0
           ? `${unitUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
           : String((p.salePrice && p.salePrice.trim()) || p.price || "").trim() || "—";
       lines.push({
@@ -517,13 +557,16 @@ export function AdminPricingClient() {
         name: p.name,
         unitPriceText,
         unitUsd,
+        unitSyp,
         qty,
-        totalUsd,
+        lineTotal,
       });
     }
-    const grandUsd = roundCatalogUsd(lines.reduce((s, x) => s + (x.totalUsd ?? 0), 0));
-    return { lines, grandUsd };
-  }, [quoteLines, bySlug]);
+    const grandTotal = isSyp
+      ? lines.reduce((s, x) => s + x.lineTotal, 0)
+      : roundCatalogUsd(lines.reduce((s, x) => s + x.lineTotal, 0));
+    return { lines, grandTotal, isSyp };
+  }, [quoteLines, bySlug, documentCurrency, sypPerUsd]);
 
   const downloadQuotePdf = async () => {
     if (quotePdfLoading) return;
@@ -546,21 +589,20 @@ export function AdminPricingClient() {
       const lineSnapshots: InvoiceLineSnap[] = [];
       let running = 0;
 
+      const isSyp = quoteComputed.isSyp;
+      const rateStored = isSyp ? String(sypPerUsd) : null;
+
       for (const l of quoteComputed.lines) {
         const qty = Math.max(0, Math.floor(l.qty));
         const unitLabel = "قطعة";
-        const unitUsdVal = l.unitUsd;
-
-        const unitUsdRounded = unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : 0;
-        const lineVal = unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal * qty) : 0;
-        running = roundCatalogUsd(running + lineVal);
-        const unitPriceText =
-          unitUsdVal > 0
-            ? `${unitUsdRounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-            : "—";
+        const lineVal = l.lineTotal;
+        running = isSyp ? running + lineVal : roundCatalogUsd(running + lineVal);
+        const unitPriceText = l.unitPriceText || "—";
         const lineValueText =
-          unitUsdVal > 0
-            ? `${lineVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+          lineVal > 0
+            ? isSyp
+              ? formatDocumentSypInteger(lineVal)
+              : `${roundCatalogUsd(lineVal).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
             : "—";
         pdfLines.push({
           sku: l.sku || "—",
@@ -577,13 +619,22 @@ export function AdminPricingClient() {
           unitPriceText,
           lineValueText,
           custom: l.lineKind === "custom",
-          unitUsd: unitUsdVal > 0 ? roundCatalogUsd(unitUsdVal) : undefined,
+          ...(isSyp
+            ? l.unitSyp > 0
+              ? { unitSyp: l.unitSyp }
+              : {}
+            : l.unitUsd > 0
+              ? { unitUsd: roundCatalogUsd(l.unitUsd) }
+              : {}),
         });
       }
 
-      const grandTotalText = `${roundCatalogUsd(running).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+      const grandNumeric = isSyp ? Math.floor(running) : roundCatalogUsd(running);
+      const grandTotalText = isSyp
+        ? formatDocumentSypInteger(grandNumeric)
+        : `${grandNumeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
-      const currencyNote = "الدولار الأمريكي";
+      const currencyNote = documentCurrencyNote(documentCurrency);
 
       const paymentLabel = paymentTerms === "deferred" ? "مؤجل" : "نقدي";
 
@@ -598,8 +649,8 @@ export function AdminPricingClient() {
         },
         lines: pdfLines,
         grandTotalText,
-        grandNumericForWords: roundCatalogUsd(running),
-        currency: "USD",
+        grandNumericForWords: grandNumeric,
+        currency: documentCurrency,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -609,7 +660,7 @@ export function AdminPricingClient() {
       a.click();
       URL.revokeObjectURL(url);
 
-      const grandNum = roundCatalogUsd(running);
+      const grandNum = grandNumeric;
       const rowId = editingLocalId ?? newCustomLineId();
       const logRow: InvoiceHistoryRow = {
         id: rowId,
@@ -618,8 +669,8 @@ export function AdminPricingClient() {
         documentDateIso: invoiceDate,
         toSir: toSir.trim(),
         statement: statement.trim(),
-        currency: "USD",
-        usdRate: null,
+        currency: documentCurrency,
+        usdRate: rateStored,
         grandTotalText,
         grandNumeric: grandNum,
         linesCount: lineSnapshots.length,
@@ -644,8 +695,8 @@ export function AdminPricingClient() {
               documentDateIso: invoiceDate,
               toSir: toSir.trim(),
               statement: statement.trim(),
-              currency: "USD",
-              usdRate: null,
+              currency: documentCurrency,
+              usdRate: rateStored,
               grandTotalText,
               grandNumeric: grandNum,
               lines: lineSnapshots,
@@ -686,8 +737,8 @@ export function AdminPricingClient() {
             documentDateIso: invoiceDate,
             toSir: toSir.trim(),
             statement: statement.trim(),
-            currency: "USD",
-            usdRate: null,
+            currency: documentCurrency,
+            usdRate: rateStored,
             grandTotalText,
             grandNumeric: grandNum,
             lines: lineSnapshots,
@@ -744,11 +795,16 @@ export function AdminPricingClient() {
     setInvoiceDate(row.documentDateIso ? row.documentDateIso.slice(0, 10) : new Date().toISOString().slice(0, 10));
     setToSir(row.toSir);
     setStatement(row.statement);
+    setDocumentCurrency(row.currency);
     if (row.usdRate) setUsdRate(row.usdRate);
+    else if (row.currency === "SYP") setUsdRate(String(getCatalogSypPerUsd()));
     setPaymentTerms(row.paymentTerms);
     const rateNum = row.usdRate != null ? Number(String(row.usdRate).replace(/[^\d.]/g, "")) : NaN;
     const sypPerUsd = Number.isFinite(rateNum) && rateNum > 0 ? rateNum : 15000;
-    const seeds = snapshotSeedsToQuote(row.lines, products, { sypPerUsdFallback: sypPerUsd });
+    const seeds = snapshotSeedsToQuote(row.lines, products, {
+      sypPerUsdFallback: sypPerUsd,
+      currency: row.currency,
+    });
     const nextLines: QuoteLine[] = [];
     for (const s of seeds) {
       if (s.kind === "product") {
@@ -790,10 +846,7 @@ export function AdminPricingClient() {
     }
     try {
       const { generateAdminQuoteBlob } = await import("@/lib/admin-quote-pdf");
-      const currencyNote =
-        row.currency === "USD"
-          ? "الدولار الأمريكي"
-          : "سجل أرشيفي — فاتورة بعملة غير الدولار (يُعاد إنشاء PDF كما في السجل)";
+      const currencyNote = documentCurrencyNote(row.currency);
       const pdfLines = row.lines.map((l) => ({
         sku: l.sku,
         name: l.name,
@@ -1102,28 +1155,31 @@ export function AdminPricingClient() {
         return;
       }
 
-      const bySku = new Map(products.map((p) => [String(p.sku ?? "").trim().toLowerCase(), p.slug] as const));
+      const bySkuExact = buildProductSlugByExactSku(products);
       const nextPrice: Record<string, string> = {};
       const nextSale: Record<string, string> = {};
       const nextDetail: Record<string, string> = {};
       const touched = new Set<string>();
       let skipped = 0;
+      const unknownSkus: string[] = [];
 
       for (const r of rows) {
-        const slugRaw =
-          String(r.slug ?? r.Slug ?? r.SLUG ?? r["Slug"] ?? r["slug"] ?? "").trim();
-        const skuRaw = String(r.SKU ?? r.sku ?? r["SKU"] ?? r["sku"] ?? "").trim();
-        const priceCell = r["السعر"] ?? r.price ?? r.Price ?? r.PRICE ?? r["price"] ?? r["Price"] ?? "";
-        const saleCell = r["سعر المبيع"] ?? r["سعر المبيع "] ?? r.salePrice ?? r["salePrice"] ?? "";
-        const detailCell = r["التفصيل"] ?? r["التفصيل "] ?? r.pricingDetail ?? r["pricingDetail"] ?? "";
-
-        const resolvedSlug =
-          slugRaw || (skuRaw ? bySku.get(skuRaw.toLowerCase()) : undefined) || "";
-
-        if (!resolvedSlug || !bySlug.get(resolvedSlug)) {
+        const skuRaw = extractSkuFromPricingExcelRow(r);
+        if (!skuRaw) {
           skipped += 1;
           continue;
         }
+
+        const resolvedSlug = bySkuExact.get(skuRaw);
+        if (!resolvedSlug) {
+          skipped += 1;
+          if (unknownSkus.length < 12) unknownSkus.push(skuRaw);
+          continue;
+        }
+
+        const priceCell = r["السعر"] ?? r.price ?? r.Price ?? r.PRICE ?? r["price"] ?? r["Price"] ?? "";
+        const saleCell = r["سعر المبيع"] ?? r["سعر المبيع "] ?? r.salePrice ?? r["salePrice"] ?? "";
+        const detailCell = r["التفصيل"] ?? r["التفصيل "] ?? r.pricingDetail ?? r["pricingDetail"] ?? "";
 
         const priceNorm = normalizeGiftPriceFromExcelCell(priceCell);
         const saleNorm = normalizeGiftPriceFromExcelCell(saleCell);
@@ -1141,8 +1197,12 @@ export function AdminPricingClient() {
       }
 
       if (touched.size === 0) {
+        const hint =
+          unknownSkus.length > 0
+            ? ` أمثلة SKU غير موجودة في الموقع: ${unknownSkus.slice(0, 5).join("، ")}`
+            : "";
         toast.error(
-          "لم يتم العثور على صفوف صالحة. تأكد من عمود SKU، وأن أحد أعمدة السعر أو سعر المبيع أو التفصيل غير فارغ."
+          `لم يتم العثور على صفوف مطابقة. تأكد من عمود SKU (نفس الكود في الموقع حرفياً) وأن أحد أعمدة السعر غير فارغ.${hint}`
         );
         return;
       }
@@ -1151,7 +1211,11 @@ export function AdminPricingClient() {
       setSalePriceDrafts((prev) => ({ ...prev, ...nextSale }));
       setDetailDrafts((prev) => ({ ...prev, ...nextDetail }));
       setImportPendingSlugs([...touched]);
-      toast.success(`تم استيراد ${touched.size} صفاً. تم تجاهل ${skipped} صفاً.`);
+      let msg = `تم استيراد ${touched.size} صفاً حسب SKU. تم تجاهل ${skipped} صفاً.`;
+      if (unknownSkus.length > 0) {
+        msg += ` SKU غير موجود: ${unknownSkus.slice(0, 5).join("، ")}${unknownSkus.length > 5 ? "…" : ""}`;
+      }
+      toast.success(msg);
     } catch (e) {
       console.error(e);
       toast.error("تعذر قراءة ملف Excel.");
@@ -1389,7 +1453,7 @@ export function AdminPricingClient() {
                             {row.toSir || "—"}
                           </td>
                           <td className="p-2 tabular-nums text-xs">{row.grandTotalText || "—"}</td>
-                          <td className="p-2">{row.currency === "USD" ? "USD" : "غير USD"}</td>
+                          <td className="p-2">{row.currency === "USD" ? "USD" : "ل.س"}</td>
                           <td className="p-2 text-xs">{row.paymentTerms === "deferred" ? "مؤجل" : "نقدي"}</td>
                           <td className="p-2 text-center tabular-nums">{row.lines.length || row.linesCount}</td>
                           <td className="p-2 text-muted-foreground text-xs">{row.fromDb ? "قاعدة" : "محلي"}</td>
@@ -1523,7 +1587,45 @@ export function AdminPricingClient() {
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">عملة المستند</p>
-                  <p className="text-sm font-medium">الدولار الأمريكي (USD) — جميع عروض الأسعار الجديدة بالدولار.</p>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="document-currency"
+                        className="h-4 w-4"
+                        checked={documentCurrency === "USD"}
+                        onChange={() => setDocumentCurrency("USD")}
+                      />
+                      الدولار الأمريكي (USD)
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="document-currency"
+                        className="h-4 w-4"
+                        checked={documentCurrency === "SYP"}
+                        onChange={() => setDocumentCurrency("SYP")}
+                      />
+                      الليرة السورية الجديدة (ل.س)
+                    </label>
+                  </div>
+                  {documentCurrency === "SYP" && (
+                    <div className="pt-1">
+                      <label htmlFor="inv-syp-rate" className="mb-1 block text-sm text-muted-foreground">
+                        سعر صرف الدولار (ل.س لكل 1 USD)
+                      </label>
+                      <Input
+                        id="inv-syp-rate"
+                        value={usdRate}
+                        onChange={(e) => setUsdRate(e.target.value)}
+                        inputMode="numeric"
+                        className="min-h-[44px] max-w-xs tabular-nums"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        تُحوَّل أسعار الهدايا من الكتالوج (USD) تلقائياً. أدخل البنود اليدوية بالليرة مباشرة.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2 border-t pt-3">
                   <p className="text-sm text-muted-foreground">طريقة السداد (تظهر في PDF وسجل الفواتير)</p>
@@ -1619,13 +1721,17 @@ export function AdminPricingClient() {
                   </div>
                   <div>
                     <label htmlFor="custom-line-price" className="mb-1 block text-sm text-muted-foreground">
-                      السعر (USD)
+                      {documentCurrency === "SYP" ? "السعر (ل.س)" : "السعر (USD)"}
                     </label>
                     <Input
                       id="custom-line-price"
                       value={customPriceDraft}
                       onChange={(e) => setCustomPriceDraft(e.target.value)}
-                      placeholder="مثال: 12.50 أو 12.50 USD"
+                      placeholder={
+                        documentCurrency === "SYP"
+                          ? "مثال: 150000 أو 150000 ل.س"
+                          : "مثال: 12.50 أو 12.50 USD"
+                      }
                       inputMode="decimal"
                       className="min-h-[44px]"
                     />
@@ -1715,7 +1821,7 @@ export function AdminPricingClient() {
                                         onChange={(e) => setCustomLinePriceInput(l.customId!, e.target.value)}
                                         inputMode="decimal"
                                         className="min-h-[44px] tabular-nums"
-                                        placeholder="USD"
+                                        placeholder={documentCurrency === "SYP" ? "ل.س" : "USD"}
                                       />
                                     ) : (
                                       l.unitPriceText || "—"
@@ -1729,7 +1835,13 @@ export function AdminPricingClient() {
                                       className="min-h-[44px] w-28 text-center tabular-nums"
                                     />
                                   </td>
-                                  <td className="p-3 tabular-nums">{l.unitUsd > 0 ? formatUsdCalculatorDisplay(l.totalUsd) : "—"}</td>
+                                  <td className="p-3 tabular-nums">
+                                    {l.lineTotal > 0
+                                      ? quoteComputed.isSyp
+                                        ? formatSypCalculatorDisplay(l.lineTotal)
+                                        : formatUsdCalculatorDisplay(l.lineTotal)
+                                      : "—"}
+                                  </td>
                                   <td className="p-3">
                                     <Button
                                       type="button"
@@ -1750,7 +1862,9 @@ export function AdminPricingClient() {
                       </div>
                       <div className="mt-4 flex items-center justify-between rounded-md border bg-muted/30 px-4 py-3">
                         <div className="text-sm text-muted-foreground">المجموع النهائي</div>
-                        <div className="text-lg font-bold tabular-nums">{formatUsdCalculatorDisplay(quoteComputed.grandUsd)}</div>
+                        <div className="text-lg font-bold tabular-nums">{quoteComputed.isSyp
+                            ? formatSypCalculatorDisplay(quoteComputed.grandTotal)
+                            : formatUsdCalculatorDisplay(quoteComputed.grandTotal)}</div>
                       </div>
                     </>
                   )}
@@ -1776,7 +1890,7 @@ export function AdminPricingClient() {
                 <div className="mb-4 rounded-lg border bg-card p-4 space-y-3">
                   <p className="text-sm font-semibold">استيراد أسعار من Excel</p>
                   <p className="text-xs text-muted-foreground">
-                    يدعم الأعمدة: <span className="font-medium">SKU</span> (أو ملف التصدير من هنا)، و
+                    يدعم الأعمدة: <span className="font-medium">SKU</span> (مطابقة حرفية مع الموقع — مثل G02)، و
                     <span className="font-medium">سعر المبيع</span> و/أو <span className="font-medium">السعر</span> و/أو{" "}
                     <span className="font-medium">التفصيل</span>.
                   </p>
@@ -1960,7 +2074,7 @@ export function AdminPricingClient() {
                 </div>
                 <div>
                   <span className="text-muted-foreground">العملة </span>
-                  {previewInvoice.currency === "USD" ? "USD" : "غير USD (أرشيف)"}
+                  {previewInvoice.currency === "USD" ? "USD" : "ل.س"}
                 </div>
                 <div>
                   <span className="text-muted-foreground">السداد </span>

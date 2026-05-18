@@ -55,6 +55,40 @@ export function buildPricingExcelExportRows(
 }
 
 /** عرض أعمدة، تجميد الصف الأول، وفلتر تلقائي. */
+/** تحويل خلية SKU من Excel إلى نص كما يُفترض إدخاله (بدون تغيير حالة الأحرف). */
+export function normalizeExcelSkuCell(raw: unknown): string {
+  if (raw === "" || raw == null) return "";
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    if (Number.isInteger(raw)) return String(raw);
+    return String(raw);
+  }
+  return String(raw)
+    .trim()
+    .replace(/[\u0660-\u0669]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x0660 + 48));
+}
+
+/** خريطة SKU → slug للمطابقة الحرفية بعد trim (لا slug ولا تجاهل لحالة الأحرف). */
+export function buildProductSlugByExactSku(products: Product[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const p of products) {
+    const sku = normalizeExcelSkuCell(p.sku);
+    if (!sku || map.has(sku)) continue;
+    map.set(sku, p.slug);
+  }
+  return map;
+}
+
+/** استخراج SKU من صف Excel (عمود SKU أو مرادفات شائعة). */
+export function extractSkuFromPricingExcelRow(row: Record<string, unknown>): string {
+  for (const [key, value] of Object.entries(row)) {
+    const kn = key.trim().replace(/\s+/g, "").toLowerCase();
+    if (kn === "sku" || kn === "كود" || kn === "كودالهدية" || kn === "رمزالمادة") {
+      return normalizeExcelSkuCell(value);
+    }
+  }
+  return normalizeExcelSkuCell(row.SKU ?? row.sku ?? row["SKU"] ?? row["sku"] ?? "");
+}
+
 export function formatPricingExcelWorksheet(ws: WorkSheet, dataRowCount: number): void {
   ws["!cols"] = [
     { wch: 8 },

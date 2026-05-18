@@ -11,11 +11,40 @@ function getSypPerUsd(): number {
   return n;
 }
 
+/** سعر صرف الكتالوج: ل.س لكل 1 USD (لتحويل أسعار المنتجات في الفواتير). */
+export function getCatalogSypPerUsd(): number {
+  return getSypPerUsd();
+}
+
 function toLatinDigits(s: string): string {
   return s.replace(/[\u0660-\u0669]/g, (ch) => String(ch.charCodeAt(0) - 0x0660));
 }
 
 /** يستخرج قيمة ليرة صحيحة من نص سعر قديم (ل.س أو SYP فقط). */
+/** مبلغ ليرة صحيح لبند يدوي في فاتورة بالليرة (بدون تحويل من دولار). */
+export function parseDocumentSypAmount(raw: string): number {
+  const fromLabel = parseSypIntegerFromPriceLabel(raw);
+  if (fromLabel != null && fromLabel > 0) return fromLabel;
+  const t = toLatinDigits(String(raw ?? "").trim()).replace(/,/g, "");
+  if (/\busd\b|\$|ر\.س/i.test(t)) return 0;
+  const digits = t.replace(/[^\d]/g, "");
+  if (!digits) return 0;
+  const n = parseInt(digits, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+export function formatDocumentSypInteger(n: number): string {
+  const v = Math.max(0, Math.floor(n));
+  return `${v.toLocaleString("en-US")} ل.س`;
+}
+
+export function usdAmountToDocumentSyp(usd: number, sypPerUsd: number): number {
+  if (!Number.isFinite(usd) || usd <= 0) return 0;
+  const rate =
+    Number.isFinite(sypPerUsd) && sypPerUsd > 0 ? sypPerUsd : getCatalogSypPerUsd();
+  return Math.round(usd * rate);
+}
+
 export function parseSypIntegerFromPriceLabel(raw: string): number | null {
   const s = toLatinDigits(String(raw ?? "").trim())
     .replace(/ل\.س|\bSYP\b|syp/gi, " ")

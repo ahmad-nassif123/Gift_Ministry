@@ -26,7 +26,7 @@ export type SnapshotQuoteSeed =
 export function snapshotSeedsToQuote(
   lines: AdminPricingInvoiceLineSnapshot[],
   products: Product[],
-  opts?: { sypPerUsdFallback?: number }
+  opts?: { sypPerUsdFallback?: number; currency?: "USD" | "SYP" }
 ): SnapshotQuoteSeed[] {
   const rate =
     opts?.sypPerUsdFallback != null &&
@@ -34,11 +34,19 @@ export function snapshotSeedsToQuote(
     opts.sypPerUsdFallback > 0
       ? opts.sypPerUsdFallback
       : 15000;
+  const isSyp = opts?.currency === "SYP";
 
   const bySku = new Map(products.map((p) => [p.sku.trim().toUpperCase(), p] as const));
   const out: SnapshotQuoteSeed[] = [];
 
   function customUnitInput(ln: AdminPricingInvoiceLineSnapshot): string {
+    if (isSyp) {
+      if (ln.unitSyp != null && Number.isFinite(ln.unitSyp) && ln.unitSyp >= 0) {
+        return String(Math.floor(ln.unitSyp));
+      }
+      const legacy = parseRoughIntegerFromPriceText(ln.unitPriceText);
+      return legacy > 0 ? String(legacy) : "0";
+    }
     if (ln.unitUsd != null && Number.isFinite(ln.unitUsd) && ln.unitUsd >= 0) {
       return String(roundCatalogUsd(ln.unitUsd));
     }
