@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { STAFF_OFFICES, getStaffOfficeLabel } from "@/lib/staff-offices";
 import type { StaffOfficeCode } from "@/lib/staff-offices";
+import { getStaffPortalLoginUrl } from "@/lib/staff-portal-metadata";
 
 type Member = {
   id: number;
@@ -44,9 +45,16 @@ export function AdminStaffWorkClient() {
   const [officeCode, setOfficeCode] = useState<StaffOfficeCode>("official_gifts");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [staffPortalUrl, setStaffPortalUrl] = useState("");
 
-  const staffPortalUrl =
-    typeof window !== "undefined" ? `${window.location.origin}/staff/login` : "/staff/login";
+  useEffect(() => {
+    const fromEnv = getStaffPortalLoginUrl();
+    if (fromEnv.startsWith("http")) {
+      setStaffPortalUrl(fromEnv);
+      return;
+    }
+    setStaffPortalUrl(getStaffPortalLoginUrl(window.location.origin));
+  }, []);
 
   const load = useCallback(async () => {
     const [mRes, sRes] = await Promise.all([
