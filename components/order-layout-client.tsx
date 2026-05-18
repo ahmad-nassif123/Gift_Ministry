@@ -14,7 +14,7 @@ export function OrderLayoutClient({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  if (pathname === "/present") {
+  if (pathname === "/present" || pathname.startsWith("/staff")) {
     return <>{children}</>;
   }
 
