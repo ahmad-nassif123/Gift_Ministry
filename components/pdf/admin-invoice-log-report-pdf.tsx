@@ -60,10 +60,19 @@ function normalizeArDateTimeLabel(s: string): string {
 
 const arBase = pdfArabicTextStyle;
 
+/** صفوف الجدول: الصفحة الأولى فيها ملخص مالي فيأخذ مساحة أقل */
+const TABLE_LAYOUT = {
+  firstPageMaxRows: 9,
+  continuationPageMaxRows: 14,
+  footerReserve: 44,
+} as const;
+
 const styles = StyleSheet.create({
   page: {
     fontFamily: PDF_FONT.amiri,
-    padding: 24,
+    paddingTop: 22,
+    paddingHorizontal: 22,
+    paddingBottom: TABLE_LAYOUT.footerReserve + 22,
     backgroundColor: COLORS.white,
   },
   title: {
@@ -162,8 +171,8 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     color: COLORS.primary,
     textAlign: "right",
-    marginBottom: 10,
-    paddingBottom: 6,
+    marginBottom: 8,
+    paddingBottom: 5,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray200,
   },
@@ -171,13 +180,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: 4,
-    overflow: "hidden",
+    width: "100%",
   },
   tableHeader: {
     flexDirection: "row-reverse",
+    alignItems: "center",
+    width: "100%",
     backgroundColor: COLORS.primary,
-    paddingVertical: 7,
-    paddingHorizontal: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 3,
   },
   th: {
     ...arBase,
@@ -192,31 +203,37 @@ const styles = StyleSheet.create({
   },
   tr: {
     flexDirection: "row-reverse",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    alignItems: "flex-start",
+    width: "100%",
+    paddingVertical: 5,
+    paddingHorizontal: 3,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray200,
-    alignItems: "center",
-    minHeight: 28,
+    minHeight: 24,
   },
   trEven: {
     backgroundColor: COLORS.gray50,
   },
   td: {
     ...arBase,
-    fontSize: 7,
+    fontSize: 7.5,
     color: COLORS.gray700,
     textAlign: "right",
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
+    lineHeight: 1.35,
   },
   tdCenter: {
     textAlign: "center",
   },
+  tdLtr: {
+    direction: "ltr",
+    textAlign: "center",
+  },
   footer: {
     position: "absolute",
-    bottom: 16,
-    left: 24,
-    right: 24,
+    bottom: 18,
+    left: 22,
+    right: 22,
     flexDirection: "row-reverse",
     justifyContent: "space-between",
     borderTopWidth: 1,
@@ -230,17 +247,30 @@ const styles = StyleSheet.create({
   },
 });
 
+/** عرض الأعمدة — المجموع 100% */
 const col = {
-  idx: "4%",
-  date: "13%",
-  invNo: "11%",
-  toSir: "17%",
-  total: "14%",
+  idx: "5%",
+  date: "14%",
+  invNo: "10%",
+  toSir: "22%",
+  total: "13%",
   currency: "8%",
   payment: "8%",
-  lines: "7%",
+  lines: "6%",
   source: "8%",
-};
+} as const;
+
+function chunkRowsForReport<T>(items: T[]): T[][] {
+  if (items.length === 0) return [[]];
+  const pages: T[][] = [];
+  pages.push(items.slice(0, TABLE_LAYOUT.firstPageMaxRows));
+  let i = TABLE_LAYOUT.firstPageMaxRows;
+  while (i < items.length) {
+    pages.push(items.slice(i, i + TABLE_LAYOUT.continuationPageMaxRows));
+    i += TABLE_LAYOUT.continuationPageMaxRows;
+  }
+  return pages;
+}
 
 export type InvoiceLogReportPdfRow = {
   idx: number;
@@ -264,19 +294,13 @@ export type InvoiceLogReportPdfSummary = {
   nDeferred: number;
 };
 
-const ROWS_PER_PAGE = 15;
-
-function chunkRows<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out.length ? out : [[]];
-}
-
 function SummaryStat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.summaryStat}>
       <Text style={styles.summaryStatLabel}>{pdfAr(label)}</Text>
-      <Text style={styles.summaryStatValue}>{pdfAr(value)}</Text>
+      <Text style={[styles.summaryStatValue, /[\u0600-\u06FF]/.test(value) ? {} : styles.tdLtr]}>
+        {/[\u0600-\u06FF]/.test(value) ? pdfAr(value) : value}
+      </Text>
     </View>
   );
 }
@@ -306,7 +330,7 @@ export function InvoiceLogReportPDF({
   rows: InvoiceLogReportPdfRow[];
   summary: InvoiceLogReportPdfSummary;
 }) {
-  const chunks = chunkRows(rows, ROWS_PER_PAGE);
+  const chunks = chunkRowsForReport(rows);
   const totalPages = Math.max(1, chunks.length);
   const sypAll = summary.sypCash + summary.sypDeferred;
   const usdAll = summary.usdCash + summary.usdDeferred;
@@ -365,30 +389,38 @@ export function InvoiceLogReportPDF({
           <View style={styles.tableWrap}>
             <TableHead />
             {pageRows.map((r, i) => {
-              const globalIdx = pageIdx * ROWS_PER_PAGE + i;
+              const rowsBefore =
+                pageIdx === 0
+                  ? 0
+                  : TABLE_LAYOUT.firstPageMaxRows +
+                    (pageIdx - 1) * TABLE_LAYOUT.continuationPageMaxRows;
+              const globalIdx = rowsBefore + i;
               const even = globalIdx % 2 === 1;
-              const truncatedSir = r.toSir.length > 44 ? `${r.toSir.slice(0, 42)}…` : r.toSir;
               const prettyTotal = formatCurrencyTextForLog(r.grandTotalText);
-              const truncatedTotal = prettyTotal.length > 30 ? `${prettyTotal.slice(0, 28)}…` : prettyTotal;
               const currencyCell = r.currencyLabel === "USD" ? "USD" : pdfAr("ل.س");
               return (
                 <View key={`${r.idx}-${globalIdx}`} style={even ? [styles.tr, styles.trEven] : styles.tr} wrap={false}>
                   <Text style={[styles.td, styles.tdCenter, { width: col.source }]}>{pdfAr(r.sourceLabel)}</Text>
-                  <Text style={[styles.td, styles.tdCenter, { width: col.lines }]}>
+                  <Text style={[styles.td, styles.tdLtr, { width: col.lines }]}>
                     {formatWesternGroupedInteger(r.linesCount)}
                   </Text>
                   <Text style={[styles.td, styles.tdCenter, { width: col.payment }]}>{pdfAr(r.paymentLabel)}</Text>
                   <Text style={[styles.td, styles.tdCenter, { width: col.currency }]}>{currencyCell}</Text>
-                  <Text style={[styles.td, { width: col.total }]}>{truncatedTotal}</Text>
-                  <Text style={[styles.td, { width: col.toSir }]}>{pdfAr(truncatedSir || "—")}</Text>
-                  <Text style={[styles.td, { width: col.invNo }]}>{r.invoiceNo || "—"}</Text>
-                  <Text style={[styles.td, { width: col.date }]}>{r.createdAtDisplay}</Text>
-                  <Text style={[styles.td, styles.tdCenter, { width: col.idx }]}>
+                  <Text style={[styles.td, styles.tdLtr, { width: col.total }]}>{prettyTotal}</Text>
+                  <Text style={[styles.td, { width: col.toSir }]}>{pdfAr(r.toSir.trim() || "—")}</Text>
+                  <Text style={[styles.td, styles.tdLtr, { width: col.invNo }]}>{r.invoiceNo.trim() || "—"}</Text>
+                  <Text style={[styles.td, styles.tdLtr, { width: col.date }]}>{r.createdAtDisplay}</Text>
+                  <Text style={[styles.td, styles.tdLtr, { width: col.idx }]}>
                     {formatWesternGroupedInteger(r.idx)}
                   </Text>
                 </View>
               );
             })}
+            {pageRows.length === 0 ? (
+              <View style={styles.tr}>
+                <Text style={[styles.td, { width: "100%", textAlign: "center" }]}>{pdfAr("لا توجد فواتير في السجل")}</Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.footer} fixed>
