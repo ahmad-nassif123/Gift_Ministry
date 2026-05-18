@@ -30,6 +30,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useConfirm } from "@/components/confirm-dialog-provider";
 import type { Product } from "@/data/products";
 import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
+import {
+  buildPricingExcelExportRows,
+  formatPricingExcelWorksheet,
+  PRICING_EXCEL_HEADERS,
+} from "@/lib/admin-pricing-excel";
 import { formatCustomerFacingPrice, formatGiftPriceUsdLabel, parseGiftPriceUsdAmount, roundCatalogUsd } from "@/lib/catalog-price-display";
 import { cn } from "@/lib/utils";
 
@@ -682,26 +687,24 @@ export function AdminPricingClient() {
   };
 
   const downloadProductsExcel = () => {
-    const rows = products
-      .filter((p) => !p.archived)
-      .map((p, i) => ({
-        التسلسل: i + 1,
-        "اسم الهدية": p.name,
-        SKU: p.sku,
-        السعر: String(priceDrafts[p.slug] ?? p.price ?? "").trim(),
-        "سعر المبيع": String(salePriceDrafts[p.slug] ?? p.salePrice ?? "").trim(),
-        التفصيل: String(detailDrafts[p.slug] ?? p.pricingDetail ?? "").trim(),
-        slug: p.slug,
-      }));
+    const rows = buildPricingExcelExportRows(products, {
+      price: priceDrafts,
+      salePrice: salePriceDrafts,
+      detail: detailDrafts,
+    });
     if (rows.length === 0) {
       toast.message("لا توجد هدايا للتصدير.");
       return;
     }
     void import("xlsx")
       .then((XLSX) => {
-        const ws = XLSX.utils.json_to_sheet(rows);
+        const ws = XLSX.utils.json_to_sheet(rows, {
+          header: [...PRICING_EXCEL_HEADERS],
+          skipHeader: false,
+        });
+        formatPricingExcelWorksheet(ws, rows.length);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "الهدايا");
+        XLSX.utils.book_append_sheet(wb, ws, "أسعار الهدايا");
         const name = `هدايا-أسعار-${new Date().toISOString().slice(0, 10)}.xlsx`;
         XLSX.writeFile(wb, name);
         toast.success("تم تنزيل ملف Excel.");
@@ -1113,7 +1116,7 @@ export function AdminPricingClient() {
 
       if (touched.size === 0) {
         toast.error(
-          "لم يتم العثور على صفوف صالحة. تأكد من عمود SKU أو slug، وأن أحد أعمدة السعر أو التفصيل غير فارغ."
+          "لم يتم العثور على صفوف صالحة. تأكد من عمود SKU، وأن أحد أعمدة السعر أو سعر المبيع أو التفصيل غير فارغ."
         );
         return;
       }
@@ -1739,9 +1742,9 @@ export function AdminPricingClient() {
                 <div className="mb-4 rounded-lg border bg-card p-4 space-y-3">
                   <p className="text-sm font-semibold">استيراد أسعار من Excel</p>
                   <p className="text-xs text-muted-foreground">
-                    يدعم الأعمدة: <span className="font-medium">slug</span> أو <span className="font-medium">SKU</span>، و
-                    <span className="font-medium"> السعر</span> و/أو <span className="font-medium">سعر المبيع</span> و/أو{" "}
-                    <span className="font-medium">التفصيل</span> (مثل ملف التصدير من هنا).
+                    يدعم الأعمدة: <span className="font-medium">SKU</span> (أو ملف التصدير من هنا)، و
+                    <span className="font-medium">سعر المبيع</span> و/أو <span className="font-medium">السعر</span> و/أو{" "}
+                    <span className="font-medium">التفصيل</span>.
                   </p>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <input
