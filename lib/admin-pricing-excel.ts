@@ -78,6 +78,22 @@ export function buildProductSlugByExactSku(products: Product[]): Map<string, str
   return map;
 }
 
+function normalizePricingExcelHeaderKey(key: string): string {
+  return key.trim().replace(/\s+/g, "").toLowerCase();
+}
+
+/** قراءة عمود بمطابقة الاسم بعد إزالة المسافات (مثل « السعر » في ملفات Excel). */
+export function getPricingExcelColumnValue(
+  row: Record<string, unknown>,
+  ...headerAliases: string[]
+): unknown {
+  const want = new Set(headerAliases.map((a) => normalizePricingExcelHeaderKey(a)));
+  for (const [key, value] of Object.entries(row)) {
+    if (want.has(normalizePricingExcelHeaderKey(key))) return value;
+  }
+  return "";
+}
+
 /** استخراج SKU من صف Excel (عمود SKU أو مرادفات شائعة). */
 export function extractSkuFromPricingExcelRow(row: Record<string, unknown>): string {
   for (const [key, value] of Object.entries(row)) {

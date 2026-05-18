@@ -37,6 +37,7 @@ import {
   buildPricingExcelExportRows,
   buildProductSlugByExactSku,
   extractSkuFromPricingExcelRow,
+  getPricingExcelColumnValue,
   formatPricingExcelWorksheet,
   PRICING_EXCEL_HEADERS,
 } from "@/lib/admin-pricing-excel";
@@ -1092,13 +1093,22 @@ export function AdminPricingClient() {
     toast.message("تم الخروج.");
   };
 
-  const saveProductPrice = async (slug: string, opts?: { silent?: boolean; batch?: boolean }) => {
+  const saveProductPrice = async (
+    slug: string,
+    opts?: {
+      silent?: boolean;
+      batch?: boolean;
+      price?: string;
+      salePrice?: string;
+      pricingDetail?: string;
+    }
+  ) => {
     if (savingSlug && !opts?.batch) return;
     setSavingSlug(slug);
     try {
-      const draft = (priceDrafts[slug] ?? "").trim();
-      const saleDraft = (salePriceDrafts[slug] ?? "").trim();
-      const detailDraft = (detailDrafts[slug] ?? "").trim();
+      const draft = (opts?.price ?? priceDrafts[slug] ?? "").trim();
+      const saleDraft = (opts?.salePrice ?? salePriceDrafts[slug] ?? "").trim();
+      const detailDraft = (opts?.pricingDetail ?? detailDrafts[slug] ?? "").trim();
       const res = await fetch("/api/admin/pricing/product-price", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1177,9 +1187,9 @@ export function AdminPricingClient() {
           continue;
         }
 
-        const priceCell = r["السعر"] ?? r.price ?? r.Price ?? r.PRICE ?? r["price"] ?? r["Price"] ?? "";
-        const saleCell = r["سعر المبيع"] ?? r["سعر المبيع "] ?? r.salePrice ?? r["salePrice"] ?? "";
-        const detailCell = r["التفصيل"] ?? r["التفصيل "] ?? r.pricingDetail ?? r["pricingDetail"] ?? "";
+        const priceCell = getPricingExcelColumnValue(r, "السعر", "price", "Price", "PRICE");
+        const saleCell = getPricingExcelColumnValue(r, "سعر المبيع", "salePrice", "SalePrice");
+        const detailCell = getPricingExcelColumnValue(r, "التفصيل", "pricingDetail", "PricingDetail");
 
         const priceNorm = normalizeGiftPriceFromExcelCell(priceCell);
         const saleNorm = normalizeGiftPriceFromExcelCell(saleCell);
@@ -1207,15 +1217,41 @@ export function AdminPricingClient() {
         return;
       }
 
+      const slugList = [...touched];
       setPriceDrafts((prev) => ({ ...prev, ...nextPrice }));
       setSalePriceDrafts((prev) => ({ ...prev, ...nextSale }));
       setDetailDrafts((prev) => ({ ...prev, ...nextDetail }));
-      setImportPendingSlugs([...touched]);
-      let msg = `تم استيراد ${touched.size} صفاً حسب SKU. تم تجاهل ${skipped} صفاً.`;
+
+      setApplyingImportedPrices(true);
+      let applied = 0;
+      let applyFail = 0;
+      for (const slug of slugList) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const done = await saveProductPrice(slug, {
+            silent: true,
+            batch: true,
+            price: nextPrice[slug],
+            salePrice: nextSale[slug],
+            pricingDetail: nextDetail[slug],
+          });
+          if (done) applied += 1;
+          else applyFail += 1;
+        } catch {
+          applyFail += 1;
+        }
+      }
+      setApplyingImportedPrices(false);
+      setImportPendingSlugs(null);
+
+      let msg = `تم تطبيق ${applied} هدية على الموقع من ملف Excel (مطابقة SKU).`;
+      if (skipped > 0) msg += ` تم تجاهل ${skipped} صفاً.`;
+      if (applyFail > 0) msg += ` فشل الحفظ لـ ${applyFail} هدية.`;
       if (unknownSkus.length > 0) {
         msg += ` SKU غير موجود: ${unknownSkus.slice(0, 5).join("، ")}${unknownSkus.length > 5 ? "…" : ""}`;
       }
-      toast.success(msg);
+      if (applied > 0) toast.success(msg);
+      else toast.error(msg);
     } catch (e) {
       console.error(e);
       toast.error("تعذر قراءة ملف Excel.");
@@ -1916,11 +1952,9 @@ export function AdminPricingClient() {
                       {applyingImportedPrices ? "جاري التحديث..." : "تطبيق الأسعار على الموقع"}
                     </Button>
                   </div>
-                  {importPendingSlugs && importPendingSlugs.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      جاهز للتطبيق: {importPendingSlugs.length} هدية.
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    بعد اختيار الملف تُطابق الأعمدة حسب SKU وتُحفظ الأسعار على الموقع تلقائياً.
+                  </p>
                 </div>
 
                 <div className="relative mb-4">
