@@ -124,13 +124,25 @@ export function integerToArabicWords(n: number): string {
   return joinParts(parts);
 }
 
+/**
+ * يمنع اختفاء حرف اللام في react-pdf + Tajawal (مثل «ثلاث» → «ثث»).
+ * يُفصل الحروف بـ ZWNJ دون تغيير المعنى.
+ */
+export function arabicWordsForPdf(text: string): string {
+  if (!text) return text;
+  const zwnj = "\u200C";
+  const safeThree = `ث${zwnj}ل${zwnj}ا${zwnj}ث`;
+  const safeThreeFem = `${safeThree}${zwnj}ة`;
+  return text.replace(/ثلاثة/g, safeThreeFem).replace(/ثلاث/g, safeThree);
+}
+
 export function grandTotalInArabicWords(amount: number, currency: "SYP" | "USD"): string {
   if (!Number.isFinite(amount) || amount < 0) return "";
 
   if (currency === "SYP") {
     const whole = Math.floor(amount + 1e-9);
     const w = integerToArabicWords(whole);
-    return `${w} ليرة سورية جديدة`;
+    return arabicWordsForPdf(`${w} ليرة سورية جديدة`);
   }
 
   const whole = Math.floor(amount);
@@ -140,5 +152,5 @@ export function grandTotalInArabicWords(amount: number, currency: "SYP" | "USD")
   if (cents > 0) {
     s += ` و${integerToArabicWords(cents)} سنتاً`;
   }
-  return s;
+  return arabicWordsForPdf(s);
 }

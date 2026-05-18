@@ -256,10 +256,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray700,
     textAlign: "right",
   },
-  /**
-   * توقيعان: المستلم يمين الصفحة، المسلم يسار الصفحة.
-   * نستخدم LTR + row-reverse حتى لا تعكس react-pdf العناصر بسبب اتجاه الصفحة RTL فيُسوّى العرضان.
-   */
+  /** توقيع المسلم فقط */
   signatureRow: {
     fontFamily: "Tajawal",
     marginTop: 28,
@@ -267,9 +264,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderTopWidth: 1,
     borderTopColor: COLORS.gray200,
-    flexDirection: "row-reverse",
-    direction: "ltr",
-    justifyContent: "space-between",
+    flexDirection: "row",
+    direction: "rtl",
+    justifyContent: "center",
     alignItems: "flex-start",
     width: "100%",
   },
@@ -443,10 +440,6 @@ export function AdminQuotePDF({
         </View>
 
         <View style={styles.signatureRow}>
-          <View style={styles.signatureBlock}>
-            <Text style={styles.signatureTitle}>المستلم</Text>
-            <View style={styles.signatureLine} />
-          </View>
           <View style={styles.signatureBlock}>
             <Text style={styles.signatureTitle}>المسلم</Text>
             <View style={styles.signatureLine} />
