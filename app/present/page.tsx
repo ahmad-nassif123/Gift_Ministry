@@ -26,7 +26,6 @@ import {
   PRODUCTS_STORAGE_KEY,
 } from "@/lib/products-local-storage";
 import { fetchPublicCatalogProducts } from "@/lib/fetch-public-products";
-import { formatCustomerFacingPrice } from "@/lib/catalog-price-display";
 
 function skuSortKey(sku: string | undefined): number {
   const s = (sku ?? "").trim();
@@ -286,11 +285,6 @@ export default function PresentPage() {
                     <h1 className="mt-1 text-xl font-bold leading-snug text-white sm:text-3xl md:text-4xl">
                       {current.name}
                     </h1>
-                    {current.salePrice || current.price ? (
-                      <p className="mt-2 text-base text-white/85 sm:text-lg">
-                        {formatCustomerFacingPrice(current)}
-                      </p>
-                    ) : null}
                     {current.shortDescription ? (
                       <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-white/70 sm:line-clamp-4 sm:text-base">
                         {current.shortDescription}

@@ -11,7 +11,9 @@ import {
   deleteProduct,
   getNextAvailableSku,
 } from "@/lib/products-db";
+import { isPricingGateOpen } from "@/lib/admin-pricing-session";
 import { getSession } from "@/lib/auth-session";
+import { stripProductsPricesForPublic } from "@/lib/product-public";
 import { generateProductSlug } from "@/lib/slug";
 
 export const dynamic = "force-dynamic";
@@ -22,14 +24,19 @@ const NO_STORE_HEADERS = {
   Pragma: "no-cache",
 } as const;
 
+async function mayExposeProductPrices(): Promise<boolean> {
+  const [session, pricingGate] = await Promise.all([getSession(), isPricingGateOpen()]);
+  return !!(session || pricingGate);
+}
+
 // GET - جلب المنتجات. include_archived=1 يتضمن المؤرشفة (archived) — الداشبورد الافتراضي بدونها
 export async function GET(request: NextRequest) {
   try {
+    const showPrices = await mayExposeProductPrices();
+
     if (!isProductsDbConfigured()) {
-      return NextResponse.json(
-        { success: true, data: staticProducts },
-        { headers: NO_STORE_HEADERS }
-      );
+      const data = showPrices ? staticProducts : stripProductsPricesForPublic(staticProducts);
+      return NextResponse.json({ success: true, data }, { headers: NO_STORE_HEADERS });
     }
     const { searchParams } = new URL(request.url);
     const includeArchived = searchParams.get("include_archived") === "1" || searchParams.get("include_archived") === "true";
@@ -41,7 +48,10 @@ export async function GET(request: NextRequest) {
     if (!quick) {
       await syncInitialProducts();
     }
-    const data = await getAllProducts(includeArchived, includeHidden);
+    let data = await getAllProducts(includeArchived, includeHidden);
+    if (!showPrices) {
+      data = stripProductsPricesForPublic(data);
+    }
     return NextResponse.json({ success: true, data }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("GET /api/products:", error);

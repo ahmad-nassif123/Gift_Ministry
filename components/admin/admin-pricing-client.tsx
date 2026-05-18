@@ -1544,7 +1544,7 @@ export function AdminPricingClient() {
                                 <div className="font-medium truncate">{p.name}</div>
                                 <div className="mt-1 flex flex-wrap gap-2">
                                   <Badge variant="outline">كود: {p.sku}</Badge>
-                                  <Badge variant="outline">العرض: {formatCustomerFacingPrice(p)}</Badge>
+                                  <Badge variant="outline">السعر: {formatCustomerFacingPrice(p)}</Badge>
                                 </div>
                               </div>
                               <Button type="button" onClick={() => addQuoteLine(p.slug)} disabled={already} className="min-h-[44px] shrink-0">
@@ -1732,7 +1732,7 @@ export function AdminPricingClient() {
                   قائمة الهدايا والأسعار
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  السعر الأساسي وسعر المبيع والتفصيل (يُعرض التفصيل في الإدارة فقط). في الموقع العام يُعرض سعر المبيع إن وُجد.
+                  السعر الأساسي وسعر المبيع والتفصيل — للإدارة فقط ولا تظهر في الموقع العام.
                 </p>
               </CardHeader>
               <CardContent>

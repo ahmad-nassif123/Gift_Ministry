@@ -25,7 +25,6 @@ import { ProductQRModal } from "@/components/product-qr-modal";
 import { BLUR_DATA_URL } from "@/lib/blur-placeholder";
 import { notifyError } from "@/lib/notify";
 import { safeLocalStorageSetItem } from "@/lib/browser-storage";
-import { formatCustomerFacingPrice } from "@/lib/catalog-price-display";
 import { fetchPublicCatalogProducts } from "@/lib/fetch-public-products";
 
 interface ProductPageProps {
@@ -296,12 +295,6 @@ export default function ProductPage({ params }: ProductPageProps) {
                   </div>
                   <div className="space-y-1 text-base text-muted-foreground">
                     <p>كود الهدية: <span className="font-semibold">{product.sku}</span></p>
-                    {(product.salePrice || product.price) ? (
-                      <p>
-                        السعر:{" "}
-                        <span className="font-semibold text-foreground">{formatCustomerFacingPrice(product)}</span>
-                      </p>
-                    ) : null}
                     <p>
                       العدد المتوفر:{" "}
                       <span className="font-semibold">{product.availableQuantity ?? 0}</span>

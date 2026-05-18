@@ -6,9 +6,9 @@ import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { consumeOneTimeShareToken } from "@/lib/product-share-db";
 import { getProductBySlug } from "@/lib/products-db";
+import { stripProductPricesForPublic } from "@/lib/product-public";
 import { getGiftTierLabel } from "@/data/products";
 import { generateWhatsAppLink } from "@/lib/whatsapp";
-import { formatCustomerFacingPrice } from "@/lib/catalog-price-display";
 import { BLUR_DATA_URL } from "@/lib/blur-placeholder";
 
 export const dynamic = "force-dynamic";
@@ -80,8 +80,8 @@ export default async function ShareOneTimePage({
     );
   }
 
-  const product = await getProductBySlug(consumed.slug);
-  if (!product || product.archived) {
+  const raw = await getProductBySlug(consumed.slug);
+  if (!raw || raw.archived) {
     return (
       <Message
         title="الهدية غير متاحة"
@@ -90,6 +90,7 @@ export default async function ShareOneTimePage({
     );
   }
 
+  const product = stripProductPricesForPublic(raw);
   const img = product.images?.[0];
   const wa = generateWhatsAppLink(product.name, product.sku);
 
@@ -140,7 +141,6 @@ export default async function ShareOneTimePage({
               </p>
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                 <span>كود: {product.sku}</span>
-                {product.salePrice || product.price ? <span>{formatCustomerFacingPrice(product)}</span> : null}
               </div>
               {product.contents?.length ? (
                 <div>
