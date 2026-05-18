@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { staffPortalMetadata } from "@/lib/staff-portal-metadata";
+import { buildStaffPortalMetadata } from "@/lib/staff-portal-metadata";
 
-export const metadata: Metadata = staffPortalMetadata();
+export const metadata: Metadata = buildStaffPortalMetadata("/staff");
 
 /** بوابة معزولة — بدون شريط الموقع أو روابط الكتالوج */
 export default function StaffPortalLayout({ children }: { children: React.ReactNode }) {

@@ -11,36 +11,63 @@ export function getStaffPortalDescription(): string {
   return fromEnv || "تعبئة تقرير الأعمال اليومي";
 }
 
-/**
- * رابط دخول الموظفين للمشاركة — يفضّل NEXT_PUBLIC_STAFF_PORTAL_URL أو NEXT_PUBLIC_SITE_URL
- * حتى لا يُنسخ رابط نشر Vercel الطويل (…-projects.vercel.app).
- */
-export function getStaffPortalLoginUrl(fallbackOrigin?: string): string {
+/** مسار المشاركة (افتراضي /staff/login — أو /work للرابط الأقصر) */
+export function getStaffSharePath(): string {
+  const p = process.env.NEXT_PUBLIC_STAFF_SHARE_PATH?.trim();
+  if (!p) return "/staff/login";
+  if (p === "/staff/login") return "/staff/login";
+  return p.startsWith("/") ? p : `/${p}`;
+}
+
+export function resolveStaffPortalSiteOrigin(): string {
   const direct = process.env.NEXT_PUBLIC_STAFF_PORTAL_URL?.trim();
   if (direct) {
+    try {
+      return new URL(direct).origin;
+    } catch {
+      /* ignore */
+    }
+  }
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
+  if (site) return site;
+  return "https://gift-catalog-six.vercel.app";
+}
+
+/**
+ * رابط المشاركة للموظفين (قصير إن وُجد /work أو مسار مخصص).
+ */
+export function getStaffPortalLoginUrl(fallbackOrigin?: string): string {
+  const path = getStaffSharePath();
+  const direct = process.env.NEXT_PUBLIC_STAFF_PORTAL_URL?.trim();
+  if (direct && path === "/staff/login") {
     return direct.includes("/staff/login")
       ? direct.replace(/\/+$/, "")
       : `${direct.replace(/\/+$/, "")}/staff/login`;
   }
-  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
-  if (site) return `${site}/staff/login`;
-  const origin = fallbackOrigin?.trim().replace(/\/+$/, "");
-  if (origin) return `${origin}/staff/login`;
-  return "/staff/login";
+  const origin = resolveStaffPortalSiteOrigin() || fallbackOrigin?.trim().replace(/\/+$/, "");
+  if (origin) return `${origin}${path}`;
+  return path;
 }
 
-/** بيانات meta لصفحات /staff — تمنع لاحقة «- كتالوج الهدايا الفاخرة» ومعاينة الكتالوج */
-export function staffPortalMetadata(): Metadata {
+/** بيانات meta لصفحات /staff — تستبدل معاينة «كتالوج الهدايا» في واتساب/تيليجرام */
+export function buildStaffPortalMetadata(pagePath = "/staff/login"): Metadata {
   const title = getStaffPortalTitle();
   const description = getStaffPortalDescription();
+  const metadataBase = new URL(resolveStaffPortalSiteOrigin());
+
   return {
+    metadataBase,
     title: { absolute: title },
     description,
     applicationName: title,
     appleWebApp: { title },
+    authors: [{ name: title }],
+    creator: title,
+    publisher: title,
     openGraph: {
       type: "website",
       locale: "ar_SA",
+      url: pagePath,
       title,
       description,
       siteName: title,
@@ -53,4 +80,9 @@ export function staffPortalMetadata(): Metadata {
     robots: { index: false, follow: false },
     manifest: "/staff/manifest.webmanifest",
   };
+}
+
+/** @deprecated استخدم buildStaffPortalMetadata */
+export function staffPortalMetadata(): Metadata {
+  return buildStaffPortalMetadata("/staff/login");
 }

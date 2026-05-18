@@ -1,8 +1,20 @@
 import { Metadata } from "next";
 import { siteConfig } from "@/lib/config";
 
+function resolveMetadataBase(): URL {
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
+  if (site) {
+    try {
+      return new URL(site);
+    } catch {
+      /* fall through */
+    }
+  }
+  return new URL("https://gift-catalog-six.vercel.app");
+}
+
 export const defaultMetadata: Metadata = {
-  metadataBase: new URL("https://yourdomain.com"), // غيّر هذا إلى رابط موقعك
+  metadataBase: resolveMetadataBase(),
   title: {
     default: siteConfig.name,
     template: `%s - ${siteConfig.name}`,
@@ -13,7 +25,7 @@ export const defaultMetadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ar_SA",
-    url: "https://yourdomain.com",
+    url: "/",
     siteName: siteConfig.name,
     title: siteConfig.name,
     description: siteConfig.description,

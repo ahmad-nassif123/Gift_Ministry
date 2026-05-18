@@ -148,7 +148,8 @@ export function AdminStaffWorkClient() {
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p className="text-muted-foreground">
-            يشارك هذا الرابط مع الموظفين فقط. بعد الدخول لا يمكنهم فتح الكتالوج أو لوحة التحكم.
+            يشارك هذا الرابط مع الموظفين فقط. الرابط القصير <span className="font-mono">/work</span> يوجّه
+            لنفس صفحة الدخول. بعد النشر قد يستغرق تيليجرام/واتساب ساعات لتحديث معاينة الرابط.
           </p>
           <Input readOnly value={staffPortalUrl} dir="ltr" className="text-left font-mono text-xs" />
           <Button
