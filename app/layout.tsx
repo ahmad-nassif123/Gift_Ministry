@@ -6,6 +6,7 @@ import { OrderLayoutClient } from "@/components/order-layout-client";
 import { SWRegister } from "@/components/sw-register";
 import { ToasterClient } from "@/components/toaster-client";
 import { ConfirmDialogProvider } from "@/components/confirm-dialog-provider";
+import { DeploymentReload } from "@/components/deployment-reload";
 
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html dir="rtl" lang="ar" className={`${cairo.variable} scroll-smooth`}>
       <body className={`${cairo.className} antialiased`}>
+        <DeploymentReload />
         <ConfirmDialogProvider>
           <OrderLayoutClient>{children}</OrderLayoutClient>
         </ConfirmDialogProvider>

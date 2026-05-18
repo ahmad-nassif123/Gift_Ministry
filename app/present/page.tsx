@@ -25,6 +25,7 @@ import {
   loadPublicProductsFromLocalStorage,
   PRODUCTS_STORAGE_KEY,
 } from "@/lib/products-local-storage";
+import { fetchPublicCatalogProducts } from "@/lib/fetch-public-products";
 import { formatCustomerFacingPrice } from "@/lib/catalog-price-display";
 
 function skuSortKey(sku: string | undefined): number {
@@ -76,29 +77,17 @@ export default function PresentPage() {
 
   useEffect(() => {
     const load = async () => {
-      try {
-        const res = await fetch("/api/products");
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setSlides(orderPresentationSlides(json.data));
-          return;
-        }
-      } catch {
-        //
+      const data = await fetchPublicCatalogProducts();
+      if (data) {
+        setSlides(orderPresentationSlides(data));
+        return;
       }
       setSlides(orderPresentationSlides(loadPublicProductsFromLocalStorage()));
     };
     void load();
 
     const onStorage = () => {
-      try {
-        const raw = localStorage.getItem(PRODUCTS_STORAGE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw) as Product[];
-        if (Array.isArray(parsed)) setSlides(orderPresentationSlides(parsed));
-      } catch {
-        //
-      }
+      void load();
     };
     window.addEventListener("storage", onStorage);
     window.addEventListener("gift-catalog-products-changed", onStorage);

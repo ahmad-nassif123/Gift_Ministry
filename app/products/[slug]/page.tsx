@@ -26,6 +26,7 @@ import { BLUR_DATA_URL } from "@/lib/blur-placeholder";
 import { notifyError } from "@/lib/notify";
 import { safeLocalStorageSetItem } from "@/lib/browser-storage";
 import { formatCustomerFacingPrice } from "@/lib/catalog-price-display";
+import { fetchPublicCatalogProducts } from "@/lib/fetch-public-products";
 
 interface ProductPageProps {
   params: {
@@ -90,17 +91,11 @@ export default function ProductPage({ params }: ProductPageProps) {
     };
 
     async function load() {
-      try {
-        const res = await fetch("/api/products");
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const data = json.data as Product[];
-          safeLocalStorageSetItem(PRODUCTS_STORAGE_KEY, JSON.stringify(data));
-          applyList(data);
-          return;
-        }
-      } catch {
-        //
+      const data = await fetchPublicCatalogProducts();
+      if (data) {
+        safeLocalStorageSetItem(PRODUCTS_STORAGE_KEY, JSON.stringify(data));
+        applyList(data);
+        return;
       }
       applyList(loadPublicProductsFromLocalStorage());
     }

@@ -34,8 +34,11 @@ export function roundCatalogUsd(usd: number): number {
 
 function formatUsdAmount(usd: number): string {
   if (!Number.isFinite(usd) || usd <= 0) return "";
-  if (usd >= 0.01) return `${usd.toFixed(2)} USD`;
-  return `${usd.toFixed(4)} USD`;
+  const digits = usd >= 0.01 ? 2 : 4;
+  return usd.toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
 /**
@@ -63,7 +66,7 @@ export function parseGiftPriceUsdAmount(raw: string): number {
 }
 
 /**
- * عرض السعر للزائر بالدولار؛ النصوص الخاصة (مثل «حسب الطلب») كما هي.
+ * عرض السعر للزائر (رقم فقط، بدون رمز عملة)؛ النصوص الخاصة (مثل «حسب الطلب») كما هي.
  */
 export function formatGiftPriceUsdLabel(raw?: string | null): string {
   if (raw == null) return "—";
@@ -72,7 +75,7 @@ export function formatGiftPriceUsdLabel(raw?: string | null): string {
   if (/حسب الطلب/i.test(t)) return t;
   const usd = parseGiftPriceUsdAmount(t);
   if (usd > 0) return formatUsdAmount(usd);
-  return t;
+  return t.replace(/\s*\bUSD\b\s*|\$/gi, "").trim() || t;
 }
 
 /** للعرض العام: سعر المبيع إن وُجد، وإلا السعر الأساسي. */

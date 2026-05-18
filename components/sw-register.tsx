@@ -12,7 +12,7 @@ export function SWRegister() {
 
     const register = async () => {
       try {
-        await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        await navigator.serviceWorker.register("/sw.js?v=2", { scope: "/", updateViaCache: "none" });
       } catch {
         // Silent: install prompt is a progressive enhancement.
       }

@@ -14,11 +14,22 @@ import {
 import { getSession } from "@/lib/auth-session";
 import { generateProductSlug } from "@/lib/slug";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+  Pragma: "no-cache",
+} as const;
+
 // GET - جلب المنتجات. include_archived=1 يتضمن المؤرشفة (archived) — الداشبورد الافتراضي بدونها
 export async function GET(request: NextRequest) {
   try {
     if (!isProductsDbConfigured()) {
-      return NextResponse.json({ success: true, data: staticProducts });
+      return NextResponse.json(
+        { success: true, data: staticProducts },
+        { headers: NO_STORE_HEADERS }
+      );
     }
     const { searchParams } = new URL(request.url);
     const includeArchived = searchParams.get("include_archived") === "1" || searchParams.get("include_archived") === "true";
@@ -31,7 +42,7 @@ export async function GET(request: NextRequest) {
       await syncInitialProducts();
     }
     const data = await getAllProducts(includeArchived, includeHidden);
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("GET /api/products:", error);
     return NextResponse.json(

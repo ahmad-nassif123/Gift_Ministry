@@ -29,6 +29,7 @@ import {
   PRODUCTS_STORAGE_KEY,
 } from "@/lib/products-local-storage";
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "@/lib/browser-storage";
+import { fetchPublicCatalogProducts } from "@/lib/fetch-public-products";
 
 function applyArabicSearchCorrections(input: string): string {
   const s = (input ?? "").trim();
@@ -107,16 +108,11 @@ function HomeContent() {
   useEffect(() => {
     setMounted(true);
     const fetchProducts = async () => {
-      try {
-        const res = await fetch("/api/products");
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setAllProducts(json.data);
-          safeLocalStorageSetItem(PRODUCTS_STORAGE_KEY, JSON.stringify(json.data));
-          return;
-        }
-      } catch {
-        //
+      const data = await fetchPublicCatalogProducts();
+      if (data) {
+        setAllProducts(data);
+        safeLocalStorageSetItem(PRODUCTS_STORAGE_KEY, JSON.stringify(data));
+        return;
       }
       setAllProducts(loadPublicProductsFromLocalStorage());
     };
@@ -127,7 +123,7 @@ function HomeContent() {
     const refreshTimer = setInterval(() => void fetchProducts(), AUTO_REFRESH_MS);
 
     const handleStorageChange = () => {
-      setAllProducts(loadPublicProductsFromLocalStorage());
+      void fetchProducts();
     };
 
     const handleCatalogNotify = () => {
