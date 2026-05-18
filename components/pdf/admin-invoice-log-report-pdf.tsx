@@ -150,21 +150,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     textAlign: "right",
   },
-  noteWrap: {
-    marginTop: 10,
-    padding: 8,
-    backgroundColor: COLORS.gray100,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: COLORS.gray200,
-  },
-  note: {
-    ...arBase,
-    fontSize: 8,
-    color: COLORS.gray700,
-    textAlign: "right",
-    lineHeight: 1.45,
-  },
   pageHint: {
     ...arBase,
     fontSize: 9,
@@ -368,13 +353,6 @@ export function InvoiceLogReportPDF({
                   <SummaryStat label="إجمالي USD — نقدي" value={fmtUsd(summary.usdCash)} />
                   <SummaryStat label="إجمالي USD — مؤجل" value={fmtUsd(summary.usdDeferred)} />
                   <SummaryStat label="مجموع USD" value={fmtUsd(usdAll)} />
-                </View>
-                <View style={styles.noteWrap}>
-                  <Text style={styles.note}>
-                    {pdfAr(
-                      "ملاحظة: الفواتير الجديدة بالدولار الأمريكي (USD). صفوف ل.س للسجلات القديمة. الأرقام بصيغة 1,234.56."
-                    )}
-                  </Text>
                 </View>
               </View>
             </>
