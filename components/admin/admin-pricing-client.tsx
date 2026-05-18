@@ -1013,11 +1013,7 @@ export function AdminPricingClient() {
       const rows = mapSourcesToPdfRows(sources);
       const now = new Date();
       const pad2 = (n: number) => String(Math.max(0, Math.floor(n))).padStart(2, "0");
-      const toArDigits = (s: string) =>
-        s.replace(/\d/g, (d) => ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"][Number(d)] ?? d);
-      const generatedAtStr = toArDigits(
-        `${now.getFullYear()}/${pad2(now.getMonth() + 1)}/${pad2(now.getDate())} — ${pad2(now.getHours())}:${pad2(now.getMinutes())}`
-      );
+      const generatedAtStr = `${now.getFullYear()}/${pad2(now.getMonth() + 1)}/${pad2(now.getDate())} — ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
       const blob = await generateInvoiceLogReportBlob({ generatedAtStr, rows, summary });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

@@ -19,12 +19,6 @@ export type InvoiceLogReportSource = {
   fromDb: boolean;
 };
 
-function toArabicIndicDigitsLatin(input: string): string {
-  return input.replace(/\d/g, (d) =>
-    ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"][Number(d)] ?? d
-  );
-}
-
 function pad2(n: number): string {
   return String(Math.max(0, Math.floor(n))).padStart(2, "0");
 }
@@ -39,7 +33,7 @@ function formatDateTimeAr(iso: string): string {
     const dd = pad2(d.getDate());
     const hh = pad2(d.getHours());
     const mi = pad2(d.getMinutes());
-    return toArabicIndicDigitsLatin(`${yyyy}/${mm}/${dd} — ${hh}:${mi}`);
+    return `${yyyy}/${mm}/${dd} — ${hh}:${mi}`;
   } catch {
     return iso;
   }
@@ -84,7 +78,7 @@ export function mapSourcesToPdfRows(list: InvoiceLogReportSource[]): InvoiceLogR
       invoiceNo: inv.invoiceNo.trim(),
       toSir: inv.toSir.trim(),
       grandTotalText: inv.grandTotalText.trim(),
-      currencyLabel: inv.currency === "USD" ? "دولار" : "أرشيف",
+      currencyLabel: inv.currency === "USD" ? "USD" : "ل.س",
       paymentLabel: inv.paymentTerms === "deferred" ? "مؤجل" : "نقدي",
       linesCount: Math.max(0, Math.floor(inv.linesCount)),
       sourceLabel: inv.fromDb ? "قاعدة" : "محلي",

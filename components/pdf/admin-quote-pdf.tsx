@@ -3,30 +3,9 @@
 import { Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
 import { invoiceAmountInArabicWords } from "@/lib/invoice-amount-words";
 import { formatWesternGroupedInteger, formatWesternUsdAmount } from "@/lib/format-western-number";
+import { ensurePdfFontsRegistered, pdfArabicTextStyle } from "@/lib/pdf-fonts";
 
-const fontBase =
-  typeof window !== "undefined" ? `${window.location.origin}/fonts/tajawal` : "/fonts/tajawal";
-/** خط Amiri — يدعم Presentation Forms-B بعد تشكيل naqqash */
-const amiriBase =
-  typeof window !== "undefined" ? `${window.location.origin}/fonts/amiri` : "/fonts/amiri";
-
-Font.register({
-  family: "Amiri",
-  fonts: [{ src: `${amiriBase}/Amiri-Regular.ttf`, fontWeight: 400 }],
-});
-
-Font.register({
-  family: "Tajawal",
-  fonts: [
-    { src: `${fontBase}/ArbFONTS-Tajawal-ExtraLight.ttf`, fontWeight: 200 },
-    { src: `${fontBase}/ArbFONTS-Tajawal-Light.ttf`, fontWeight: 300 },
-    { src: `${fontBase}/ArbFONTS-Tajawal-Regular.ttf`, fontWeight: 400 },
-    { src: `${fontBase}/ArbFONTS-Tajawal-Medium.ttf`, fontWeight: 500 },
-    { src: `${fontBase}/ArbFONTS-Tajawal-Bold.ttf`, fontWeight: 700 },
-    { src: `${fontBase}/ArbFONTS-Tajawal-ExtraBold.ttf`, fontWeight: 800 },
-    { src: `${fontBase}/ArbFONTS-Tajawal-Black.ttf`, fontWeight: 900 },
-  ],
-});
+ensurePdfFontsRegistered();
 
 const COLORS = {
   primary: "#0b443a",
@@ -210,13 +189,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   wordsText: {
-    fontFamily: "Amiri",
+    ...pdfArabicTextStyle,
     fontSize: 11,
     fontWeight: 400,
     color: COLORS.gray700,
-    /** نص مشكّل بـ naqqash — يُعرض LTR مع محاذاة يمين */
-    direction: "ltr",
-    textAlign: "right",
     lineHeight: 1.55,
   },
   totalsRow: {
