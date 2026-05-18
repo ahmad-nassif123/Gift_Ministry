@@ -1,9 +1,7 @@
 import { grandTotalInArabicWords } from "@/lib/arabic-number-words";
+import { shapeArabicForReactPdf } from "@/lib/arabic-pdf-text";
 
-/**
- * نص «المبلغ كتابة» للـ PDF.
- * النص المنطقي + خط Noto Naskh + RTL (بدون arabic-persian-reshaper لأنه يكسّر ث آخر «ثلاث»).
- */
+/** نص «المبلغ كتابة» جاهز لـ react-pdf (منطقي → تشكيل naqqash). */
 export function invoiceAmountInArabicWords(amount: number, currency: "SYP" | "USD"): string {
-  return grandTotalInArabicWords(amount, currency);
+  return shapeArabicForReactPdf(grandTotalInArabicWords(amount, currency));
 }

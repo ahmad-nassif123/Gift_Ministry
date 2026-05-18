@@ -6,15 +6,13 @@ import { formatWesternGroupedInteger, formatWesternUsdAmount } from "@/lib/forma
 
 const fontBase =
   typeof window !== "undefined" ? `${window.location.origin}/fonts/tajawal` : "/fonts/tajawal";
-const notoBase =
-  typeof window !== "undefined" ? `${window.location.origin}/fonts/noto-naskh-arabic` : "/fonts/noto-naskh-arabic";
+/** خط Amiri — يدعم Presentation Forms-B بعد تشكيل naqqash */
+const amiriBase =
+  typeof window !== "undefined" ? `${window.location.origin}/fonts/amiri` : "/fonts/amiri";
 
 Font.register({
-  family: "NotoNaskh",
-  fonts: [
-    { src: `${notoBase}/noto-naskh-arabic-arabic-400-normal.woff`, fontWeight: 400 },
-    { src: `${notoBase}/noto-naskh-arabic-arabic-700-normal.woff`, fontWeight: 700 },
-  ],
+  family: "Amiri",
+  fonts: [{ src: `${amiriBase}/Amiri-Regular.ttf`, fontWeight: 400 }],
 });
 
 Font.register({
@@ -212,11 +210,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   wordsText: {
-    fontFamily: "NotoNaskh",
-    fontSize: 10,
+    fontFamily: "Amiri",
+    fontSize: 11,
     fontWeight: 400,
     color: COLORS.gray700,
-    direction: "rtl",
+    /** نص مشكّل بـ naqqash — يُعرض LTR مع محاذاة يمين */
+    direction: "ltr",
     textAlign: "right",
     lineHeight: 1.55,
   },
