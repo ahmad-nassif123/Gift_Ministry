@@ -30,7 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useConfirm } from "@/components/confirm-dialog-provider";
 import type { Product } from "@/data/products";
 import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
-import { pricingGateTitle, PRICING_PASSWORD_ENV } from "@/lib/admin-auth-help";
+import { pricingGateTitle } from "@/lib/admin-auth-help";
 import {
   buildPricingExcelExportRows,
   formatPricingExcelWorksheet,
@@ -986,10 +986,7 @@ export function AdminPricingClient() {
         await checkGate();
         return;
       }
-      toast.error(
-        json.error ||
-          (res.status === 503 ? `أضف ${PRICING_PASSWORD_ENV} في Vercel ثم Redeploy` : "كلمة المرور غير صحيحة")
-      );
+      toast.error(json.error || (res.status === 503 ? "تسجيل الدخول غير مفعّل على الخادم" : "كلمة المرور غير صحيحة"));
     } catch {
       toast.error("حدث خطأ أثناء الدخول.");
     } finally {
@@ -1216,10 +1213,6 @@ export function AdminPricingClient() {
                   {loggingIn ? "جاري الدخول..." : "دخول"}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
-                  <Link href="/login" className="underline hover:text-foreground">
-                    لوحة التحكم
-                  </Link>
-                  <span className="mx-2 text-muted-foreground/60">·</span>
                   <Link href="/" className="underline hover:text-foreground">
                     العودة للرئيسية
                   </Link>

@@ -5,7 +5,6 @@ import {
   isAdminPricingPasswordConfigured,
   setPricingGateCookie,
 } from "@/lib/admin-pricing-session";
-import { PRICING_PASSWORD_ENV } from "@/lib/admin-auth-help";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `تسجيل الدخول غير مفعّل: أضف ${PRICING_PASSWORD_ENV} في Vercel ثم Redeploy.`,
+          error: "تسجيل الدخول غير مفعّل على الخادم.",
         },
         { status: 503 }
       );

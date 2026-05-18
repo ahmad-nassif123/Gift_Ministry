@@ -55,7 +55,7 @@ function LoginForm() {
       if (res.status === 503) {
         setError(
           data.error?.trim() ||
-            "تسجيل الدخول غير مفعّل على الخادم. أضف ADMIN_PASSWORD في Vercel ثم Redeploy."
+            "تسجيل الدخول غير مفعّل على الخادم."
         );
         return;
       }
