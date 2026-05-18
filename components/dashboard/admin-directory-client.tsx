@@ -163,11 +163,8 @@ export function AdminDirectoryClient() {
           <div>
             <h1 className="text-2xl font-bold">كلمة مرور الدخول الرئيسية</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              تغيير كلمة مرور <strong>/login</strong> (لوحة التحكم) — متغير{" "}
-              <span className="font-mono text-xs">ADMIN_PASSWORD</span> على Vercel. صفحة{" "}
-              <strong>/admin/pricing</strong> تستخدم متغيراً منفصلاً:{" "}
-              <span className="font-mono text-xs">ADMIN_PRICING_PASSWORD</span>. عند الحفظ هنا تُستخدم كلمة
-              القاعدة بدل Vercel لـ /login فقط.
+              تغيير كلمة مرور صفحة تسجيل الدخول إلى لوحة التحكم. عند الحفظ في القاعدة تُستخدم كلمة المرور
+              الجديدة بدل الإعداد على الاستضافة.
             </p>
           </div>
           <Button variant="outline" asChild>
@@ -249,8 +246,8 @@ export function AdminDirectoryClient() {
                       </CardTitle>
                       <CardDescription>
                         {usesDbPassword
-                          ? "الدخول حالياً يعتمد على كلمة المرور المحفوظة في القاعدة (وليس على ADMIN_PASSWORD)."
-                          : "الدخول حالياً يعتمد على ADMIN_PASSWORD في Vercel. بعد الحفظ هنا تصبح كلمة المرور من القاعدة هي المعتمدة."}
+                          ? "الدخول حالياً يعتمد على كلمة المرور المحفوظة في القاعدة."
+                          : "الدخول حالياً يعتمد على كلمة المرور في الاستضافة. بعد الحفظ هنا تُستخدم كلمة القاعدة."}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
