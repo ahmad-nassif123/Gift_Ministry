@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { loginPageHint, pricingGateHint, PRICING_PASSWORD_ENV, LOGIN_PASSWORD_ENV } from "@/lib/admin-auth-help";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -79,15 +78,11 @@ function LoginForm() {
     <div className="w-full max-w-sm space-y-6 rounded-lg border bg-card p-6 shadow-sm">
       <div className="text-center">
         <h1 className="text-2xl font-bold">تسجيل الدخول</h1>
-        <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{loginPageHint}</p>
-        <p className="mt-2 rounded-md border border-muted bg-muted/40 px-3 py-2 text-xs text-muted-foreground leading-relaxed">
-          <span className="font-medium text-foreground">ليست صفحة أسعار الهدايا.</span> {pricingGateHint}
-        </p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="password" className="mb-1 block text-sm font-medium">
-            كلمة المرور ({LOGIN_PASSWORD_ENV})
+            كلمة المرور
           </label>
           <PasswordInput
             id="password"
@@ -105,17 +100,10 @@ function LoginForm() {
           {submitting ? "جاري الدخول..." : "دخول"}
         </Button>
       </form>
-      <p className="text-center text-sm text-muted-foreground space-y-1">
-        <span className="block">
-          <Link href="/admin/pricing" className="underline hover:text-foreground">
-            أسعار الهدايا ({PRICING_PASSWORD_ENV})
-          </Link>
-        </span>
-        <span className="block">
-          <Link href="/" className="underline hover:text-foreground">
-            العودة للرئيسية
-          </Link>
-        </span>
+      <p className="text-center text-sm text-muted-foreground">
+        <Link href="/" className="underline hover:text-foreground">
+          العودة للرئيسية
+        </Link>
       </p>
     </div>
   );
