@@ -31,6 +31,12 @@ import { useConfirm } from "@/components/confirm-dialog-provider";
 import type { Product } from "@/data/products";
 import { snapshotSeedsToQuote } from "@/lib/admin-invoice-snapshot";
 import {
+  pricingGateHint,
+  pricingGateTitle,
+  PRICING_PASSWORD_ENV,
+  LOGIN_PASSWORD_ENV,
+} from "@/lib/admin-auth-help";
+import {
   buildPricingExcelExportRows,
   formatPricingExcelWorksheet,
   PRICING_EXCEL_HEADERS,
@@ -985,7 +991,10 @@ export function AdminPricingClient() {
         await checkGate();
         return;
       }
-      toast.error(json.error || "كلمة المرور غير صحيحة");
+      toast.error(
+        json.error ||
+          (res.status === 503 ? `أضف ${PRICING_PASSWORD_ENV} في Vercel ثم Redeploy` : "كلمة المرور غير صحيحة")
+      );
     } catch {
       toast.error("حدث خطأ أثناء الدخول.");
     } finally {
@@ -1191,14 +1200,15 @@ export function AdminPricingClient() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
-                الإدارة — تسجيل الدخول
+                {pricingGateTitle}
               </CardTitle>
+              <p className="text-sm text-muted-foreground leading-relaxed">{pricingGateHint}</p>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
                   <label htmlFor="admin-pricing-pass" className="mb-1 block text-sm font-medium">
-                    كلمة المرور
+                    كلمة المرور ({PRICING_PASSWORD_ENV})
                   </label>
                   <PasswordInput
                     id="admin-pricing-pass"
@@ -1211,10 +1221,17 @@ export function AdminPricingClient() {
                 <Button type="submit" className="min-h-[44px] w-full" disabled={loggingIn}>
                   {loggingIn ? "جاري الدخول..." : "دخول"}
                 </Button>
-                <p className="text-center text-sm text-muted-foreground">
-                  <Link href="/" className="underline hover:text-foreground">
-                    العودة للرئيسية
-                  </Link>
+                <p className="text-center text-sm text-muted-foreground space-y-1">
+                  <span className="block">
+                    <Link href="/login" className="underline hover:text-foreground">
+                      لوحة التحكم ({LOGIN_PASSWORD_ENV})
+                    </Link>
+                  </span>
+                  <span className="block">
+                    <Link href="/" className="underline hover:text-foreground">
+                      العودة للرئيسية
+                    </Link>
+                  </span>
                 </p>
               </form>
             </CardContent>
@@ -1849,7 +1866,7 @@ export function AdminPricingClient() {
                               <Input
                                 value={salePriceDrafts[p.slug] ?? ""}
                                 onChange={(e) => setSalePriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
-                                placeholder="200 USD"
+                                placeholder="مثال: 425"
                                 className="min-h-[44px]"
                                 aria-label={`سعر المبيع ${p.name}`}
                               />
@@ -1858,7 +1875,7 @@ export function AdminPricingClient() {
                               <Input
                                 value={priceDrafts[p.slug] ?? ""}
                                 onChange={(e) => setPriceDrafts((prev) => ({ ...prev, [p.slug]: e.target.value }))}
-                                placeholder="175 USD"
+                                placeholder="مثال: 350"
                                 className="min-h-[44px]"
                                 aria-label={`السعر ${p.name}`}
                               />

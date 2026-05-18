@@ -162,9 +162,12 @@ export function AdminDirectoryClient() {
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold">كلمة مرور الدخول الرئيسية</h1>
-            <p className="text-sm text-muted-foreground">
-              تغيير كلمة المرور لصفحة تسجيل الدخول إلى لوحة التحكم. عند الحفظ في القاعدة تُستخدم بدل
-              ADMIN_PASSWORD على الاستضافة.
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              تغيير كلمة مرور <strong>/login</strong> (لوحة التحكم) — متغير{" "}
+              <span className="font-mono text-xs">ADMIN_PASSWORD</span> على Vercel. صفحة{" "}
+              <strong>/admin/pricing</strong> تستخدم متغيراً منفصلاً:{" "}
+              <span className="font-mono text-xs">ADMIN_PRICING_PASSWORD</span>. عند الحفظ هنا تُستخدم كلمة
+              القاعدة بدل Vercel لـ /login فقط.
             </p>
           </div>
           <Button variant="outline" asChild>

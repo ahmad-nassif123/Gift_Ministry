@@ -18,7 +18,15 @@ function sign(payload: string): string {
 export function getAdminPricingPassword(): string {
   const fromEnv = (process.env.ADMIN_PRICING_PASSWORD ?? "").trim();
   if (fromEnv) return fromEnv;
+  // تطوير محلي فقط — الإنتاج يتطلب ADMIN_PRICING_PASSWORD على Vercel
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+    return "";
+  }
   return "19982026";
+}
+
+export function isAdminPricingPasswordConfigured(): boolean {
+  return getAdminPricingPassword().length > 0;
 }
 
 interface PricingGatePayload {
