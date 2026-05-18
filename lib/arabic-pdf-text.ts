@@ -1,10 +1,4 @@
-import reshaper from "arabic-persian-reshaper";
-
-type ArabicReshaperModule = {
-  ArabicShaper: { convertArabic: (text: string) => string };
-};
-
-const { ArabicShaper } = reshaper as unknown as ArabicReshaperModule;
+import { ArabicShaper } from "arabic-persian-reshaper";
 
 /** تشكيل النص العربي لـ react-pdf (عرض بصيغ Unicode Presentation). */
 export function shapeArabicForPdf(logicalText: string): string {
