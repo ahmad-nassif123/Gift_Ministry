@@ -1,11 +1,21 @@
 "use client";
 
 import { Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
-import { grandTotalInArabicWords } from "@/lib/arabic-number-words";
+import { invoiceAmountInArabicWords } from "@/lib/invoice-amount-words";
 import { formatWesternGroupedInteger, formatWesternUsdAmount } from "@/lib/format-western-number";
 
 const fontBase =
   typeof window !== "undefined" ? `${window.location.origin}/fonts/tajawal` : "/fonts/tajawal";
+const notoBase =
+  typeof window !== "undefined" ? `${window.location.origin}/fonts/noto-naskh-arabic` : "/fonts/noto-naskh-arabic";
+
+Font.register({
+  family: "NotoNaskh",
+  fonts: [
+    { src: `${notoBase}/noto-naskh-arabic-arabic-400-normal.woff`, fontWeight: 400 },
+    { src: `${notoBase}/noto-naskh-arabic-arabic-700-normal.woff`, fontWeight: 700 },
+  ],
+});
 
 Font.register({
   family: "Tajawal",
@@ -202,11 +212,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   wordsText: {
-    fontFamily: "Tajawal",
-    fontSize: 9,
+    fontFamily: "NotoNaskh",
+    fontSize: 10,
+    fontWeight: 400,
     color: COLORS.gray700,
+    direction: "ltr",
     textAlign: "right",
-    lineHeight: 1.45,
+    lineHeight: 1.55,
   },
   totalsRow: {
     fontFamily: "Tajawal",
@@ -335,7 +347,7 @@ export function AdminQuotePDF({
   grandNumericForWords: number;
   currency: "SYP" | "USD";
 }) {
-  const words = grandTotalInArabicWords(grandNumericForWords, currency);
+  const words = invoiceAmountInArabicWords(grandNumericForWords, currency);
   const n = Number.isFinite(grandNumericForWords) ? Math.max(0, grandNumericForWords) : 0;
   const figuresAmountSyp = `${formatWesternGroupedInteger(Math.floor(n))} ل.س`;
   const figuresAmountUsd = `${formatWesternUsdAmount(n)} USD`;
