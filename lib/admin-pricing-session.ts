@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 
 const COOKIE_NAME = "admin_pricing_gate";
-const MAX_AGE_SEC = 60 * 60 * 24; // 24 ساعة
+const GATE_MAX_AGE_SHORT = 60 * 60 * 24; // يوم واحد
+const GATE_MAX_AGE_REMEMBER = 60 * 60 * 24 * 30; // 30 يوماً
 
 const DEFAULT_SECRET = "gift-catalog-admin-session-secret-2024";
 
@@ -34,10 +35,11 @@ interface PricingGatePayload {
   exp: number;
 }
 
-export function createPricingGateToken(): string {
+export function createPricingGateToken(remember = false): string {
+  const maxAgeSec = remember ? GATE_MAX_AGE_REMEMBER : GATE_MAX_AGE_SHORT;
   const payload: PricingGatePayload = {
     kind: "admin_pricing",
-    exp: Math.floor(Date.now() / 1000) + MAX_AGE_SEC,
+    exp: Math.floor(Date.now() / 1000) + maxAgeSec,
   };
   const payloadStr = JSON.stringify(payload);
   const sig = sign(payloadStr);
@@ -59,15 +61,19 @@ export function verifyPricingGateToken(token: string): boolean {
   }
 }
 
-export async function setPricingGateCookie(token: string): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, token, {
+function pricingGateCookieOptions(remember = false) {
+  return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: MAX_AGE_SEC,
+    sameSite: "lax" as const,
+    maxAge: remember ? GATE_MAX_AGE_REMEMBER : GATE_MAX_AGE_SHORT,
     path: "/",
-  });
+  };
+}
+
+export async function setPricingGateCookie(token: string, remember = false): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(COOKIE_NAME, token, pricingGateCookieOptions(remember));
 }
 
 export async function deletePricingGateCookie(): Promise<void> {

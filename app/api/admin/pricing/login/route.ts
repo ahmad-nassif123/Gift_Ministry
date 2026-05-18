@@ -10,8 +10,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { password?: unknown };
+    const body = (await request.json()) as { password?: unknown; rememberMe?: unknown };
     const pass = typeof body.password === "string" ? body.password.trim() : "";
+    const rememberMe = body.rememberMe === true || body.rememberMe === "true";
     if (!isAdminPricingPasswordConfigured()) {
       return NextResponse.json(
         {
@@ -25,8 +26,8 @@ export async function POST(request: NextRequest) {
     if (pass !== expected) {
       return NextResponse.json({ success: false, error: "كلمة المرور غير صحيحة" }, { status: 401 });
     }
-    const token = createPricingGateToken();
-    await setPricingGateCookie(token);
+    const token = createPricingGateToken(rememberMe);
+    await setPricingGateCookie(token, rememberMe);
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("POST /api/admin/pricing/login:", e);

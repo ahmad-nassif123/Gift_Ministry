@@ -1,19 +1,30 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import { RememberMeCheckbox } from "@/components/remember-me-checkbox";
+import { loadRememberedLogin, persistRememberedLogin } from "@/lib/remember-login";
 
 function LoginForm() {
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get("next") ?? "";
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const saved = loadRememberedLogin("dashboard");
+    if (saved.remember && saved.password) {
+      setRememberMe(true);
+      setPassword(saved.password);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +34,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, next: nextUrl || undefined }),
+        body: JSON.stringify({ password, rememberMe, next: nextUrl || undefined }),
         credentials: "include",
       });
       const raw = await res.text();
@@ -40,6 +51,7 @@ function LoginForm() {
       }
 
       if (data.success) {
+        persistRememberedLogin("dashboard", password, rememberMe);
         const dest =
           typeof data.redirect === "string" && data.redirect.startsWith("/")
             ? data.redirect
@@ -93,6 +105,14 @@ function LoginForm() {
             autoComplete="current-password"
           />
         </div>
+        <RememberMeCheckbox
+          id="login-remember-me"
+          checked={rememberMe}
+          onCheckedChange={(checked) => {
+            setRememberMe(checked);
+            if (!checked) persistRememberedLogin("dashboard", "", false);
+          }}
+        />
         {error && (
           <p className="text-sm text-destructive">{error}</p>
         )}

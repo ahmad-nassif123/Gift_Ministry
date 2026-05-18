@@ -24,6 +24,8 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { RememberMeCheckbox } from "@/components/remember-me-checkbox";
+import { loadRememberedLogin, persistRememberedLogin } from "@/lib/remember-login";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -202,6 +204,7 @@ export function AdminPricingClient() {
   const confirm = useConfirm();
   const [gateOk, setGateOk] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -327,6 +330,15 @@ export function AdminPricingClient() {
   useEffect(() => {
     void checkGate();
   }, [checkGate]);
+
+  useEffect(() => {
+    if (gateOk) return;
+    const saved = loadRememberedLogin("pricing");
+    if (saved.remember && saved.password) {
+      setRememberMe(true);
+      setPassword(saved.password);
+    }
+  }, [gateOk]);
 
   useEffect(() => {
     if (gateOk) void fetchProducts();
@@ -977,12 +989,13 @@ export function AdminPricingClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, rememberMe }),
       });
       const json = (await res.json()) as { success?: boolean; error?: string };
       if (res.ok && json.success) {
+        persistRememberedLogin("pricing", password, rememberMe);
         toast.success("تم الدخول.");
-        setPassword("");
+        if (!rememberMe) setPassword("");
         await checkGate();
         return;
       }
@@ -1209,6 +1222,14 @@ export function AdminPricingClient() {
                     required
                   />
                 </div>
+                <RememberMeCheckbox
+                  id="admin-pricing-remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => {
+                    setRememberMe(checked);
+                    if (!checked) persistRememberedLogin("pricing", "", false);
+                  }}
+                />
                 <Button type="submit" className="min-h-[44px] w-full" disabled={loggingIn}>
                   {loggingIn ? "جاري الدخول..." : "دخول"}
                 </Button>

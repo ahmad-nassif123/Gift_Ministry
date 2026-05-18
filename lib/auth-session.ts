@@ -8,7 +8,10 @@ import {
 } from "@/lib/dashboard-password-db";
 
 const COOKIE_NAME = "admin_session";
-const MAX_AGE = 60 * 60 * 24 * 7; // 7 أيام
+/** جلسة عادية (بدون تذكرني) */
+const SESSION_MAX_AGE_SHORT = 60 * 60 * 24; // يوم واحد
+/** مع تذكرني */
+const SESSION_MAX_AGE_REMEMBER = 60 * 60 * 24 * 30; // 30 يوماً
 
 const DEFAULT_SECRET = "gift-catalog-admin-session-secret-2024";
 
@@ -26,10 +29,11 @@ export interface SessionPayload {
   exp: number;
 }
 
-export function createSessionToken(email: string): string {
+export function createSessionToken(email: string, remember = false): string {
+  const maxAgeSec = remember ? SESSION_MAX_AGE_REMEMBER : SESSION_MAX_AGE_SHORT;
   const payload: SessionPayload = {
     email: email.trim().toLowerCase(),
-    exp: Math.floor(Date.now() / 1000) + MAX_AGE,
+    exp: Math.floor(Date.now() / 1000) + maxAgeSec,
   };
   const payloadStr = JSON.stringify(payload);
   const sig = sign(payloadStr);
@@ -58,12 +62,12 @@ export async function getSession(): Promise<SessionPayload | null> {
 }
 
 /** خيارات كوكي الجلسة — مُشارَكة بين Route Handlers والـ Server */
-function adminSessionCookieOptions() {
+function adminSessionCookieOptions(remember = false) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    maxAge: MAX_AGE,
+    maxAge: remember ? SESSION_MAX_AGE_REMEMBER : SESSION_MAX_AGE_SHORT,
     path: "/",
   };
 }
@@ -72,8 +76,8 @@ function adminSessionCookieOptions() {
  * في Route Handlers يجب ضبط الكوكي على `NextResponse` وليس `cookies().set()` فقط،
  * وإلا قد لا يُرفق `Set-Cookie` مع الاستجابة (المتصفح لا يخزّن الجلسة).
  */
-export function attachAdminSessionToResponse(response: NextResponse, token: string): void {
-  response.cookies.set(COOKIE_NAME, token, adminSessionCookieOptions());
+export function attachAdminSessionToResponse(response: NextResponse, token: string, remember = false): void {
+  response.cookies.set(COOKIE_NAME, token, adminSessionCookieOptions(remember));
 }
 
 export function clearAdminSessionOnResponse(response: NextResponse): void {
