@@ -251,6 +251,8 @@ export function AdminPricingClient() {
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>("cash");
   const [editingServerId, setEditingServerId] = useState<number | null>(null);
   const [editingLocalId, setEditingLocalId] = useState<string | null>(null);
+  const [invoiceEditOpen, setInvoiceEditOpen] = useState(false);
+  const [savingInvoice, setSavingInvoice] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<InvoiceHistoryRow | null>(null);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [salePriceDrafts, setSalePriceDrafts] = useState<Record<string, string>>({});
@@ -569,168 +571,114 @@ export function AdminPricingClient() {
     return { lines, grandTotal, isSyp };
   }, [quoteLines, bySlug, documentCurrency, sypPerUsd]);
 
-  const downloadQuotePdf = async () => {
-    if (quotePdfLoading) return;
-    if (quoteComputed.lines.length === 0) {
-      toast.message("أضف هدية واحدة على الأقل للحساب.");
-      return;
-    }
-    setQuotePdfLoading(true);
-    try {
-      const { generateAdminQuoteBlob } = await import("@/lib/admin-quote-pdf");
-      type PdfLine = {
-        sku: string;
-        name: string;
-        qty: number;
-        unit: string;
-        unitPriceText: string;
-        lineValueText: string;
-      };
-      const pdfLines: PdfLine[] = [];
-      const lineSnapshots: InvoiceLineSnap[] = [];
-      let running = 0;
+  type BuiltInvoicePayload = {
+    lineSnapshots: InvoiceLineSnap[];
+    grandNumeric: number;
+    grandTotalText: string;
+    pdfLines: Array<{
+      sku: string;
+      name: string;
+      qty: number;
+      unit: string;
+      unitPriceText: string;
+      lineValueText: string;
+    }>;
+    rateStored: string | null;
+    paymentLabel: string;
+    currencyNote: string;
+  };
 
-      const isSyp = quoteComputed.isSyp;
-      const rateStored = isSyp ? String(sypPerUsd) : null;
+  const buildInvoiceFromCalculator = (): BuiltInvoicePayload | null => {
+    if (quoteComputed.lines.length === 0) return null;
+    const isSyp = quoteComputed.isSyp;
+    const rateStored = isSyp ? String(sypPerUsd) : null;
+    const pdfLines: BuiltInvoicePayload["pdfLines"] = [];
+    const lineSnapshots: InvoiceLineSnap[] = [];
+    let running = 0;
 
-      for (const l of quoteComputed.lines) {
-        const qty = Math.max(0, Math.floor(l.qty));
-        const unitLabel = "قطعة";
-        const lineVal = l.lineTotal;
-        running = isSyp ? running + lineVal : roundCatalogUsd(running + lineVal);
-        const unitPriceText = l.unitPriceText || "—";
-        const lineValueText =
-          lineVal > 0
-            ? isSyp
-              ? formatDocumentSypInteger(lineVal)
-              : `${roundCatalogUsd(lineVal).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-            : "—";
-        pdfLines.push({
-          sku: l.sku || "—",
-          name: l.name,
-          qty,
-          unit: unitLabel,
-          unitPriceText,
-          lineValueText,
-        });
-        lineSnapshots.push({
-          sku: l.sku || "—",
-          name: l.name,
-          qty,
-          unitPriceText,
-          lineValueText,
-          custom: l.lineKind === "custom",
-          ...(isSyp
-            ? l.unitSyp > 0
-              ? { unitSyp: l.unitSyp }
-              : {}
-            : l.unitUsd > 0
-              ? { unitUsd: roundCatalogUsd(l.unitUsd) }
-              : {}),
-        });
-      }
-
-      const grandNumeric = isSyp ? Math.floor(running) : roundCatalogUsd(running);
-      const grandTotalText = isSyp
-        ? formatDocumentSypInteger(grandNumeric)
-        : `${grandNumeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
-
-      const currencyNote = documentCurrencyNote(documentCurrency);
-
-      const paymentLabel = paymentTerms === "deferred" ? "مؤجل" : "نقدي";
-
-      const blob = await generateAdminQuoteBlob({
-        meta: {
-          toSir: toSir.trim(),
-          statement: statement.trim(),
-          invoiceNo: invoiceNo.trim(),
-          documentDateStr: formatInvoiceDateAr(invoiceDate),
-          currencyNote,
-          paymentLabel,
-        },
-        lines: pdfLines,
-        grandTotalText,
-        grandNumericForWords: grandNumeric,
-        currency: documentCurrency,
+    for (const l of quoteComputed.lines) {
+      const qty = Math.max(0, Math.floor(l.qty));
+      const lineVal = l.lineTotal;
+      running = isSyp ? running + lineVal : roundCatalogUsd(running + lineVal);
+      const unitPriceText = l.unitPriceText || "—";
+      const lineValueText =
+        lineVal > 0
+          ? isSyp
+            ? formatDocumentSypInteger(lineVal)
+            : `${roundCatalogUsd(lineVal).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+          : "—";
+      pdfLines.push({
+        sku: l.sku || "—",
+        name: l.name,
+        qty,
+        unit: "قطعة",
+        unitPriceText,
+        lineValueText,
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const safeInv = invoiceNo.trim().replace(/[^\w\u0600-\u06FF-]+/g, "_").slice(0, 40);
-      a.download = invoicePdfDownloadFilename(safeInv, "عرض-أسعار");
-      a.click();
-      URL.revokeObjectURL(url);
+      lineSnapshots.push({
+        sku: l.sku || "—",
+        name: l.name,
+        qty,
+        unitPriceText,
+        lineValueText,
+        custom: l.lineKind === "custom",
+        ...(isSyp
+          ? l.unitSyp > 0
+            ? { unitSyp: l.unitSyp }
+            : {}
+          : l.unitUsd > 0
+            ? { unitUsd: roundCatalogUsd(l.unitUsd) }
+            : {}),
+      });
+    }
 
-      const grandNum = grandNumeric;
-      const rowId = editingLocalId ?? newCustomLineId();
-      const logRow: InvoiceHistoryRow = {
-        id: rowId,
-        createdAt: new Date().toISOString(),
-        invoiceNo: invoiceNo.trim(),
-        documentDateIso: invoiceDate,
-        toSir: toSir.trim(),
-        statement: statement.trim(),
-        currency: documentCurrency,
-        usdRate: rateStored,
-        grandTotalText,
-        grandNumeric: grandNum,
-        linesCount: lineSnapshots.length,
-        lines: lineSnapshots,
-        paymentTerms,
-        fromDb: false,
-      };
+    const grandNumeric = isSyp ? Math.floor(running) : roundCatalogUsd(running);
+    const grandTotalText = isSyp
+      ? formatDocumentSypInteger(grandNumeric)
+      : `${grandNumeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
-      const pushLocalLog = () => {
-        appendLocalInvoiceHistory(logRow);
-        setInvoiceHistory((h) => [logRow, ...h.filter((x) => x.id !== logRow.id)].slice(0, 120));
-      };
+    return {
+      lineSnapshots,
+      grandNumeric,
+      grandTotalText,
+      pdfLines,
+      rateStored,
+      paymentLabel: paymentTerms === "deferred" ? "مؤجل" : "نقدي",
+      currencyNote: documentCurrencyNote(documentCurrency),
+    };
+  };
 
-      if (editingServerId != null) {
-        try {
-          const patchRes = await fetch(`/api/admin/pricing/invoices/${editingServerId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              invoiceNo: invoiceNo.trim(),
-              documentDateIso: invoiceDate,
-              toSir: toSir.trim(),
-              statement: statement.trim(),
-              currency: documentCurrency,
-              usdRate: rateStored,
-              grandTotalText,
-              grandNumeric: grandNum,
-              lines: lineSnapshots,
-              paymentTerms,
-            }),
-          });
-          const pj = (await patchRes.json()) as { success?: boolean };
-          if (patchRes.ok && pj.success) {
-            toast.success("تم تحديث الفاتورة في السجل.");
-            setEditingServerId(null);
-            setEditingLocalId(null);
-            await loadInvoices();
-            return;
-          }
-          toast.error("تعذر تحديث السجل في القاعدة.");
-        } catch {
-          toast.error("تعذر تحديث السجل.");
-        }
-        return;
-      }
+  const persistInvoiceRecord = async (
+    built: BuiltInvoicePayload
+  ): Promise<"patched" | "local" | "logged" | "failed"> => {
+    const { lineSnapshots, grandNumeric, grandTotalText, rateStored } = built;
+    const rowId = editingLocalId ?? newCustomLineId();
+    const logRow: InvoiceHistoryRow = {
+      id: rowId,
+      createdAt: new Date().toISOString(),
+      invoiceNo: invoiceNo.trim(),
+      documentDateIso: invoiceDate,
+      toSir: toSir.trim(),
+      statement: statement.trim(),
+      currency: documentCurrency,
+      usdRate: rateStored,
+      grandTotalText,
+      grandNumeric,
+      linesCount: lineSnapshots.length,
+      lines: lineSnapshots,
+      paymentTerms,
+      fromDb: false,
+    };
 
-      if (editingLocalId != null) {
-        upsertLocalInvoiceHistory(logRow);
-        setInvoiceHistory((h) => [logRow, ...h.filter((x) => x.id !== editingLocalId)].slice(0, 120));
-        setEditingLocalId(null);
-        setEditingServerId(null);
-        toast.success("تم تحديث الفاتورة في السجل المحلي.");
-        return;
-      }
+    const pushLocalLog = () => {
+      appendLocalInvoiceHistory(logRow);
+      setInvoiceHistory((h) => [logRow, ...h.filter((x) => x.id !== logRow.id)].slice(0, 120));
+    };
 
+    if (editingServerId != null) {
       try {
-        const logRes = await fetch("/api/admin/pricing/invoices/log", {
-          method: "POST",
+        const patchRes = await fetch(`/api/admin/pricing/invoices/${editingServerId}`, {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
@@ -741,19 +689,141 @@ export function AdminPricingClient() {
             currency: documentCurrency,
             usdRate: rateStored,
             grandTotalText,
-            grandNumeric: grandNum,
+            grandNumeric,
             lines: lineSnapshots,
             paymentTerms,
           }),
         });
-        const lj = (await logRes.json()) as { success?: boolean; stored?: boolean };
-        if (logRes.ok && lj.success && lj.stored) {
+        const pj = (await patchRes.json()) as { success?: boolean };
+        if (patchRes.ok && pj.success) {
+          setEditingServerId(null);
+          setEditingLocalId(null);
           await loadInvoices();
-        } else {
-          pushLocalLog();
+          return "patched";
         }
+        return "failed";
       } catch {
-        pushLocalLog();
+        return "failed";
+      }
+    }
+
+    if (editingLocalId != null) {
+      upsertLocalInvoiceHistory(logRow);
+      setInvoiceHistory((h) => [logRow, ...h.filter((x) => x.id !== editingLocalId)].slice(0, 120));
+      setEditingLocalId(null);
+      setEditingServerId(null);
+      return "local";
+    }
+
+    try {
+      const logRes = await fetch("/api/admin/pricing/invoices/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          invoiceNo: invoiceNo.trim(),
+          documentDateIso: invoiceDate,
+          toSir: toSir.trim(),
+          statement: statement.trim(),
+          currency: documentCurrency,
+          usdRate: rateStored,
+          grandTotalText,
+          grandNumeric,
+          lines: lineSnapshots,
+          paymentTerms,
+        }),
+      });
+      const lj = (await logRes.json()) as { success?: boolean; stored?: boolean };
+      if (logRes.ok && lj.success && lj.stored) {
+        await loadInvoices();
+        return "logged";
+      }
+      pushLocalLog();
+      return "logged";
+    } catch {
+      pushLocalLog();
+      return "logged";
+    }
+  };
+
+  const cancelInvoiceEdit = () => {
+    setInvoiceEditOpen(false);
+    setEditingServerId(null);
+    setEditingLocalId(null);
+  };
+
+  const saveInvoiceEdit = async () => {
+    if (savingInvoice || quotePdfLoading) return;
+    if (editingServerId == null && editingLocalId == null) {
+      toast.error("لا توجد فاتورة قيد التعديل.");
+      return;
+    }
+    const built = buildInvoiceFromCalculator();
+    if (!built) {
+      toast.message("أضف بنداً واحداً على الأقل.");
+      return;
+    }
+    setSavingInvoice(true);
+    try {
+      const result = await persistInvoiceRecord(built);
+      if (result === "patched" || result === "local") {
+        toast.success("تم حفظ التعديلات.");
+        setInvoiceEditOpen(false);
+      } else {
+        toast.error("تعذر حفظ التعديلات.");
+      }
+    } finally {
+      setSavingInvoice(false);
+    }
+  };
+
+  const openInvoiceEdit = (row: InvoiceHistoryRow) => {
+    setAdminTab("gift-pricing");
+    applyInvoiceToForm(row, "edit");
+    setInvoiceEditOpen(true);
+  };
+
+  const downloadQuotePdf = async () => {
+    if (quotePdfLoading) return;
+    const built = buildInvoiceFromCalculator();
+    if (!built) {
+      toast.message("أضف هدية واحدة على الأقل للحساب.");
+      return;
+    }
+    setQuotePdfLoading(true);
+    try {
+      const { generateAdminQuoteBlob } = await import("@/lib/admin-quote-pdf");
+      const blob = await generateAdminQuoteBlob({
+        meta: {
+          toSir: toSir.trim(),
+          statement: statement.trim(),
+          invoiceNo: invoiceNo.trim(),
+          documentDateStr: formatInvoiceDateAr(invoiceDate),
+          currencyNote: built.currencyNote,
+          paymentLabel: built.paymentLabel,
+        },
+        lines: built.pdfLines,
+        grandTotalText: built.grandTotalText,
+        grandNumericForWords: built.grandNumeric,
+        currency: documentCurrency,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeInv = invoiceNo.trim().replace(/[^\w\u0600-\u06FF-]+/g, "_").slice(0, 40);
+      a.download = invoicePdfDownloadFilename(safeInv, "عرض-أسعار");
+      a.click();
+      URL.revokeObjectURL(url);
+
+      const wasEditing = editingServerId != null || editingLocalId != null;
+      const result = await persistInvoiceRecord(built);
+      if (wasEditing) {
+        if (result === "patched" || result === "local") {
+          toast.success("تم تحديث الفاتورة في السجل.");
+          setInvoiceEditOpen(false);
+        } else if (result === "failed") {
+          toast.error("تم PDF لكن تعذر تحديث السجل في القاعدة.");
+        }
       }
     } catch (e) {
       console.error(e);
@@ -833,11 +903,9 @@ export function AdminPricingClient() {
       setEditingServerId(null);
       setEditingLocalId(null);
     }
-    toast.message(
-      mode === "edit"
-        ? "تم تحميل الفاتورة للتعديل — عدّل ثم «تحميل PDF» لحفظ التغييرات في السجل."
-        : "تم تحميل البيانات للاستخدام — يمكنك تغيير رقم الفاتورة ثم الطباعة كنسخة جديدة."
-    );
+    if (mode !== "edit") {
+      toast.message("تم تحميل البيانات للاستخدام — يمكنك تغيير رقم الفاتورة ثم الطباعة كنسخة جديدة.");
+    }
   };
 
   const reprintInvoicePdf = async (row: InvoiceHistoryRow) => {
@@ -1076,6 +1144,7 @@ export function AdminPricingClient() {
     setPaymentTerms("cash");
     setEditingServerId(null);
     setEditingLocalId(null);
+    setInvoiceEditOpen(false);
     setPreviewInvoice(null);
     setToSir("");
     setStatement("");
@@ -1506,7 +1575,7 @@ export function AdminPricingClient() {
                                 variant="outline"
                                 size="sm"
                                 className="h-9 px-2"
-                                onClick={() => applyInvoiceToForm(row, "edit")}
+                                onClick={() => openInvoiceEdit(row)}
                                 title="تعديل"
                               >
                                 <Pencil className="h-4 w-4" />
@@ -1552,32 +1621,73 @@ export function AdminPricingClient() {
             </CardContent>
           </Card>
 
-          <Card className="mb-6">
-            <CardHeader>
+          {invoiceEditOpen && (
+            <div
+              className="fixed inset-0 z-40 bg-black/60"
+              aria-hidden
+              onClick={() => cancelInvoiceEdit()}
+            />
+          )}
+
+          <Card
+            className={cn(
+              "mb-6",
+              invoiceEditOpen &&
+                "fixed inset-2 z-50 m-0 flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden shadow-2xl sm:inset-4"
+            )}
+          >
+            {invoiceEditOpen && (
+              <div className="shrink-0 border-b bg-background px-4 py-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold">تعديل الفاتورة</h2>
+                    <p className="text-sm text-muted-foreground tabular-nums">{invoiceNo || "—"}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="min-h-[44px]"
+                      onClick={() => cancelInvoiceEdit()}
+                      disabled={savingInvoice || quotePdfLoading}
+                    >
+                      إلغاء
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-[44px]"
+                      onClick={() => void downloadQuotePdf()}
+                      disabled={quotePdfLoading || quoteComputed.lines.length === 0}
+                    >
+                      <FileText className="ml-2 h-4 w-4" />
+                      {quotePdfLoading ? "جاري PDF..." : "تحميل PDF"}
+                    </Button>
+                    <Button
+                      type="button"
+                      className="min-h-[44px] bg-[#0b443a] hover:bg-[#0b443a]/90"
+                      onClick={() => void saveInvoiceEdit()}
+                      disabled={savingInvoice || quotePdfLoading || quoteComputed.lines.length === 0}
+                    >
+                      {savingInvoice ? "جاري الحفظ..." : "حفظ التعديلات"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <CardHeader className={cn(invoiceEditOpen && "shrink-0 pb-2")}>
               <CardTitle className="flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
-                تسعير الهدايا
+                {invoiceEditOpen ? "محرر الفاتورة" : "تسعير الهدايا"}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                ابحث عن هدية وأضفها للحساب، ثم حدّد الكمية لتحصل على الإجمالي ويمكنك تحميل PDF.
-              </p>
-
-              {(editingServerId != null || editingLocalId != null) && (
-                <div className="rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                  يتم الآن تعديل فاتورة مسجّلة — بعد التعديل اضغط «تحميل PDF» لتحديث السجل.{" "}
-                  <button
-                    type="button"
-                    className="font-medium underline underline-offset-2"
-                    onClick={() => {
-                      setEditingServerId(null);
-                      setEditingLocalId(null);
-                    }}
-                  >
-                    إلغاء وضع التعديل
-                  </button>
-                </div>
+            <CardContent
+              className={cn("space-y-4", invoiceEditOpen && "min-h-0 flex-1 overflow-y-auto overscroll-contain")}
+            >
+              {!invoiceEditOpen && (
+                <p className="text-sm text-muted-foreground">
+                  ابحث عن هدية وأضفها للحساب، ثم حدّد الكمية لتحصل على الإجمالي ويمكنك تحميل PDF.
+                </p>
               )}
 
               <div className="rounded-lg border bg-card p-4 space-y-4">
@@ -1793,10 +1903,17 @@ export function AdminPricingClient() {
                 <CardHeader className="py-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <CardTitle className="text-base">حاسبة الأسعار</CardTitle>
-                    <Button type="button" onClick={() => void downloadQuotePdf()} disabled={quotePdfLoading || quoteComputed.lines.length === 0} className="min-h-[44px]">
-                      <FileText className="ml-2 h-4 w-4" />
-                      {quotePdfLoading ? "جاري إنشاء PDF..." : "تحميل PDF"}
-                    </Button>
+                    {!invoiceEditOpen && (
+                      <Button
+                        type="button"
+                        onClick={() => void downloadQuotePdf()}
+                        disabled={quotePdfLoading || quoteComputed.lines.length === 0}
+                        className="min-h-[44px]"
+                      >
+                        <FileText className="ml-2 h-4 w-4" />
+                        {quotePdfLoading ? "جاري إنشاء PDF..." : "تحميل PDF"}
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
