@@ -1356,12 +1356,6 @@ export function AdminPricingClient() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link href="/admin/staff-work">
-                <Button type="button" variant="outline" className="min-h-[44px] w-full sm:w-auto">
-                  <FileText className="ml-2 h-4 w-4" />
-                  أعمال الموظفين
-                </Button>
-              </Link>
               <Button
                 type="button"
                 variant="outline"
