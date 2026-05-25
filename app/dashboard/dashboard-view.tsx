@@ -219,9 +219,6 @@ export function DashboardView() {
         images: Array.isArray(product.images) ? product.images : [],
         catalogImage: typeof product.catalogImage === "string" ? product.catalogImage : undefined,
         availableQuantity: product.availableQuantity ?? 0,
-        price: product.price,
-        salePrice: product.salePrice,
-        pricingDetail: product.pricingDetail,
       };
       const response = await fetch("/api/products", {
         method: isEdit ? "PUT" : "POST",

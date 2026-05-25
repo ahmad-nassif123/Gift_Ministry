@@ -783,6 +783,15 @@ export function AdminPricingClient() {
     setInvoiceEditOpen(true);
   };
 
+  useEffect(() => {
+    if (!invoiceEditOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [invoiceEditOpen]);
+
   const downloadQuotePdf = async () => {
     if (quotePdfLoading) return;
     const built = buildInvoiceFromCalculator();
@@ -1353,6 +1362,340 @@ export function AdminPricingClient() {
     }
   };
 
+  const pricingCalculatorPanel = (
+    <>
+<div className="rounded-lg border bg-card p-4 space-y-4">
+  <p className="text-sm font-semibold">بيانات الفاتورة (PDF)</p>
+  <div className="grid gap-3 sm:grid-cols-2">
+    <div>
+      <label htmlFor="inv-no" className="mb-1 block text-sm text-muted-foreground">
+        رقم الفاتورة
+      </label>
+      <Input id="inv-no" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} className="min-h-[44px]" />
+    </div>
+    <div>
+      <label htmlFor="inv-date" className="mb-1 block text-sm text-muted-foreground">
+        التاريخ
+      </label>
+      <Input id="inv-date" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="min-h-[44px]" />
+    </div>
+    <div className="sm:col-span-2">
+      <label htmlFor="inv-to" className="mb-1 block text-sm text-muted-foreground">
+        الجهة
+      </label>
+      <Input id="inv-to" value={toSir} onChange={(e) => setToSir(e.target.value)} placeholder="اسم الجهة أو الشخص" className="min-h-[44px]" />
+    </div>
+    <div className="sm:col-span-2">
+      <label htmlFor="inv-st" className="mb-1 block text-sm text-muted-foreground">
+        البيان
+      </label>
+      <textarea
+        id="inv-st"
+        value={statement}
+        onChange={(e) => setStatement(e.target.value)}
+        placeholder="وصف مختصر للمعاملة أو الغرض من عرض السعر..."
+        rows={3}
+        className={cn(
+          "flex w-full rounded-md border border-input bg-background px-4 py-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[88px]"
+        )}
+      />
+    </div>
+  </div>
+  <div className="space-y-2">
+    <p className="text-sm text-muted-foreground">عملة المستند</p>
+    <div className="flex flex-wrap gap-4 text-sm">
+      <label className="flex cursor-pointer items-center gap-2">
+        <input
+          type="radio"
+          name="document-currency"
+          className="h-4 w-4"
+          checked={documentCurrency === "USD"}
+          onChange={() => setDocumentCurrency("USD")}
+        />
+        الدولار الأمريكي (USD)
+      </label>
+      <label className="flex cursor-pointer items-center gap-2">
+        <input
+          type="radio"
+          name="document-currency"
+          className="h-4 w-4"
+          checked={documentCurrency === "SYP"}
+          onChange={() => setDocumentCurrency("SYP")}
+        />
+        الليرة السورية الجديدة (ل.س)
+      </label>
+    </div>
+    {documentCurrency === "SYP" && (
+      <div className="pt-1">
+        <label htmlFor="inv-syp-rate" className="mb-1 block text-sm text-muted-foreground">
+          سعر صرف الدولار (ل.س لكل 1 USD)
+        </label>
+        <Input
+          id="inv-syp-rate"
+          value={usdRate}
+          onChange={(e) => setUsdRate(e.target.value)}
+          inputMode="numeric"
+          className="min-h-[44px] max-w-xs tabular-nums"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          تُحوَّل أسعار الهدايا من الكتالوج (USD) تلقائياً. أدخل البنود اليدوية بالليرة مباشرة.
+        </p>
+      </div>
+    )}
+  </div>
+  <div className="space-y-2 border-t pt-3">
+    <p className="text-sm text-muted-foreground">طريقة السداد (تظهر في PDF وسجل الفواتير)</p>
+    <div className="flex flex-wrap gap-4 text-sm">
+      <label className="flex cursor-pointer items-center gap-2">
+        <input
+          type="radio"
+          name="payment-terms"
+          className="h-4 w-4"
+          checked={paymentTerms === "cash"}
+          onChange={() => setPaymentTerms("cash")}
+        />
+        نقدي
+      </label>
+      <label className="flex cursor-pointer items-center gap-2">
+        <input
+          type="radio"
+          name="payment-terms"
+          className="h-4 w-4"
+          checked={paymentTerms === "deferred"}
+          onChange={() => setPaymentTerms("deferred")}
+        />
+        مؤجل
+      </label>
+    </div>
+  </div>
+</div>
+
+<div className="relative">
+  <Search className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+  <Input
+    type="text"
+    placeholder="بحث (الاسم / SKU / slug)..."
+    value={adminQuery}
+    onChange={(e) => setAdminQuery(e.target.value)}
+    className="pr-10 min-h-[44px] text-base"
+  />
+</div>
+
+{adminQuery.trim() !== "" && (
+  <Card className="border-dashed">
+    <CardHeader className="py-4">
+      <CardTitle className="text-base">نتائج البحث</CardTitle>
+    </CardHeader>
+    <CardContent>
+      {adminSearchResults.length === 0 ? (
+        <p className="text-sm text-muted-foreground">لا توجد نتائج.</p>
+      ) : (
+        <ul className="space-y-2">
+          {adminSearchResults.map((p) => {
+            const already = quoteLines.some((x) => x.kind === "product" && x.slug === p.slug);
+            return (
+              <li key={p.slug} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3">
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{p.name}</div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <Badge variant="outline">كود: {p.sku}</Badge>
+                    <Badge variant="outline">السعر: {formatCustomerFacingPrice(p)}</Badge>
+                  </div>
+                </div>
+                <Button type="button" onClick={() => addQuoteLine(p.slug)} disabled={already} className="min-h-[44px] shrink-0">
+                  <Plus className="ml-2 h-5 w-5" />
+                  {already ? "مضاف" : "إضافة"}
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </CardContent>
+  </Card>
+)}
+
+<Card className="border-primary/25">
+  <CardHeader className="py-4">
+    <CardTitle className="text-base">بند يدوي (غير مضاف للموقع)</CardTitle>
+    <p className="text-sm text-muted-foreground mt-1">
+      أدخل اسماً وسعراً وكمية دون إنشاء منتج في الكتالوج — يظهر في الحاسبة وفي PDF مثل باقي البنود.
+    </p>
+  </CardHeader>
+  <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="sm:col-span-2">
+      <label htmlFor="custom-line-name" className="mb-1 block text-sm text-muted-foreground">
+        اسم البند
+      </label>
+      <Input
+        id="custom-line-name"
+        value={customNameDraft}
+        onChange={(e) => setCustomNameDraft(e.target.value)}
+        placeholder="مثال: تغليف خاص"
+        className="min-h-[44px]"
+      />
+    </div>
+    <div>
+      <label htmlFor="custom-line-price" className="mb-1 block text-sm text-muted-foreground">
+        {documentCurrency === "SYP" ? "السعر (ل.س)" : "السعر (USD)"}
+      </label>
+      <Input
+        id="custom-line-price"
+        value={customPriceDraft}
+        onChange={(e) => setCustomPriceDraft(e.target.value)}
+        placeholder={
+          documentCurrency === "SYP"
+            ? "مثال: 150000 أو 150000 ل.س"
+            : "مثال: 12.50 أو 12.50 USD"
+        }
+        inputMode="decimal"
+        className="min-h-[44px]"
+      />
+    </div>
+    <div>
+      <label htmlFor="custom-line-qty" className="mb-1 block text-sm text-muted-foreground">
+        العدد
+      </label>
+      <Input
+        id="custom-line-qty"
+        value={customQtyDraft}
+        onChange={(e) => setCustomQtyDraft(e.target.value)}
+        inputMode="numeric"
+        className="min-h-[44px]"
+      />
+    </div>
+    <div className="sm:col-span-2 lg:col-span-4">
+      <Button type="button" className="min-h-[44px]" onClick={() => addCustomToQuote()}>
+        <Plus className="ml-2 h-4 w-4" />
+        إضافة للحاسبة
+      </Button>
+    </div>
+  </CardContent>
+</Card>
+
+<Card>
+  <CardHeader className="py-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <CardTitle className="text-base">حاسبة الأسعار</CardTitle>
+      {!invoiceEditOpen && (
+        <Button
+          type="button"
+          onClick={() => void downloadQuotePdf()}
+          disabled={quotePdfLoading || quoteComputed.lines.length === 0}
+          className="min-h-[44px]"
+        >
+          <FileText className="ml-2 h-4 w-4" />
+          {quotePdfLoading ? "جاري إنشاء PDF..." : "تحميل PDF"}
+        </Button>
+      )}
+    </div>
+  </CardHeader>
+  <CardContent>
+    {quoteComputed.lines.length === 0 ? (
+      <p className="text-sm text-muted-foreground">لا توجد بنود في الحاسبة بعد.</p>
+    ) : (
+      <>
+        <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
+          <table className="w-full min-w-[760px] text-right text-sm">
+            <thead className="bg-muted">
+              <tr>
+                <th className="p-3 w-10">#</th>
+                <th className="p-3 w-24">المصدر</th>
+                <th className="p-3">الاسم</th>
+                <th className="p-3 w-24">SKU</th>
+                <th className="p-3 min-w-[120px]">السعر الفردي</th>
+                <th className="p-3 w-28">الكمية</th>
+                <th className="p-3 w-28">الإجمالي</th>
+                <th className="p-3 w-16">حذف</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quoteComputed.lines.map((l, idx) => {
+                const rawCustom =
+                  l.lineKind === "custom" && l.customId
+                    ? (quoteLines.find((x) => x.kind === "custom" && x.id === l.customId) as QuoteCustomLine | undefined)
+                    : undefined;
+                return (
+                  <tr key={l.rowKey} className="border-t align-middle">
+                    <td className="p-3">{idx + 1}</td>
+                    <td className="p-3">
+                      {l.lineKind === "custom" ? (
+                        <Badge variant="secondary">يدوي</Badge>
+                      ) : (
+                        <Badge variant="outline">موقع</Badge>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {l.lineKind === "custom" && l.customId ? (
+                        <Input
+                          value={rawCustom?.name ?? ""}
+                          onChange={(e) => setCustomLineName(l.customId!, e.target.value)}
+                          className="min-h-[44px] font-medium"
+                        />
+                      ) : (
+                        <span className="font-medium">{l.name}</span>
+                      )}
+                    </td>
+                    <td className="p-3">{l.sku || "—"}</td>
+                    <td className="p-3">
+                      {l.lineKind === "custom" && l.customId ? (
+                        <Input
+                          value={rawCustom?.unitPriceInput ?? ""}
+                          onChange={(e) => setCustomLinePriceInput(l.customId!, e.target.value)}
+                          inputMode="decimal"
+                          className="min-h-[44px] tabular-nums"
+                          placeholder={documentCurrency === "SYP" ? "ل.س" : "USD"}
+                        />
+                      ) : (
+                        l.unitPriceText || "—"
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <Input
+                        value={String(l.qty)}
+                        onChange={(e) => setQuoteQty(l.rowKey, l.lineKind, e.target.value)}
+                        inputMode="numeric"
+                        className="min-h-[44px] w-28 text-center tabular-nums"
+                      />
+                    </td>
+                    <td className="p-3 tabular-nums">
+                      {l.lineTotal > 0
+                        ? quoteComputed.isSyp
+                          ? formatSypCalculatorDisplay(l.lineTotal)
+                          : formatUsdCalculatorDisplay(l.lineTotal)
+                        : "—"}
+                    </td>
+                    <td className="p-3">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="min-h-[44px]"
+                        onClick={() => removeQuoteLine(l.rowKey, l.lineKind)}
+                      >
+                        <X className="h-4 w-4" />
+                        <span className="sr-only">حذف</span>
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4 flex items-center justify-between rounded-md border bg-muted/30 px-4 py-3">
+          <div className="text-sm text-muted-foreground">المجموع النهائي</div>
+          <div className="text-lg font-bold tabular-nums">{quoteComputed.isSyp
+              ? formatSypCalculatorDisplay(quoteComputed.grandTotal)
+              : formatUsdCalculatorDisplay(quoteComputed.grandTotal)}</div>
+        </div>
+      </>
+    )}
+  </CardContent>
+</Card>
+    </>
+  );
+
   if (gateOk === null) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -1482,6 +1825,7 @@ export function AdminPricingClient() {
 
           {adminTab === "gift-pricing" && (
             <>
+          {!invoiceEditOpen && (
           <Card className="mb-6">
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-4">
               <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -1620,30 +1964,41 @@ export function AdminPricingClient() {
               )}
             </CardContent>
           </Card>
-
-          {invoiceEditOpen && (
-            <div
-              className="fixed inset-0 z-40 bg-black/60"
-              aria-hidden
-              onClick={() => cancelInvoiceEdit()}
-            />
           )}
 
-          <Card
-            className={cn(
-              "mb-6",
-              invoiceEditOpen &&
-                "fixed inset-2 z-50 m-0 flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden shadow-2xl sm:inset-4"
-            )}
-          >
-            {invoiceEditOpen && (
-              <div className="shrink-0 border-b bg-background px-4 py-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold">تعديل الفاتورة</h2>
-                    <p className="text-sm text-muted-foreground tabular-nums">{invoiceNo || "—"}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+          {!invoiceEditOpen ? (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calculator className="h-5 w-5" />
+                  تسعير الهدايا
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  ابحث عن هدية وأضفها للحساب، ثم حدّد الكمية لتحصل على الإجمالي ويمكنك تحميل PDF.
+                </p>
+                {pricingCalculatorPanel}
+              </CardContent>
+            </Card>
+          ) : (
+            <Dialog
+              open={invoiceEditOpen}
+              onOpenChange={(open) => {
+                if (!open) cancelInvoiceEdit();
+              }}
+            >
+              <DialogContent
+                className="flex h-[min(96dvh,920px)] w-[min(98vw,56rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:rounded-xl [&>button]:hidden"
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => {
+                  if (savingInvoice || quotePdfLoading) e.preventDefault();
+                }}
+              >
+                <DialogHeader className="shrink-0 space-y-3 border-b px-4 py-4 text-right sm:px-6">
+                  <DialogTitle className="text-lg">تعديل الفاتورة</DialogTitle>
+                  <p className="text-sm text-muted-foreground tabular-nums">{invoiceNo || "—"}</p>
+                  <div className="flex flex-wrap gap-2 pt-1">
                     <Button
                       type="button"
                       variant="ghost"
@@ -1672,355 +2027,14 @@ export function AdminPricingClient() {
                       {savingInvoice ? "جاري الحفظ..." : "حفظ التعديلات"}
                     </Button>
                   </div>
+                </DialogHeader>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+                  {pricingCalculatorPanel}
                 </div>
-              </div>
-            )}
-            <CardHeader className={cn(invoiceEditOpen && "shrink-0 pb-2")}>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5" />
-                {invoiceEditOpen ? "محرر الفاتورة" : "تسعير الهدايا"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent
-              className={cn("space-y-4", invoiceEditOpen && "min-h-0 flex-1 overflow-y-auto overscroll-contain")}
-            >
-              {!invoiceEditOpen && (
-                <p className="text-sm text-muted-foreground">
-                  ابحث عن هدية وأضفها للحساب، ثم حدّد الكمية لتحصل على الإجمالي ويمكنك تحميل PDF.
-                </p>
-              )}
+              </DialogContent>
+            </Dialog>
+          )}
 
-              <div className="rounded-lg border bg-card p-4 space-y-4">
-                <p className="text-sm font-semibold">بيانات الفاتورة (PDF)</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="inv-no" className="mb-1 block text-sm text-muted-foreground">
-                      رقم الفاتورة
-                    </label>
-                    <Input id="inv-no" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} className="min-h-[44px]" />
-                  </div>
-                  <div>
-                    <label htmlFor="inv-date" className="mb-1 block text-sm text-muted-foreground">
-                      التاريخ
-                    </label>
-                    <Input id="inv-date" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="min-h-[44px]" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label htmlFor="inv-to" className="mb-1 block text-sm text-muted-foreground">
-                      الجهة
-                    </label>
-                    <Input id="inv-to" value={toSir} onChange={(e) => setToSir(e.target.value)} placeholder="اسم الجهة أو الشخص" className="min-h-[44px]" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label htmlFor="inv-st" className="mb-1 block text-sm text-muted-foreground">
-                      البيان
-                    </label>
-                    <textarea
-                      id="inv-st"
-                      value={statement}
-                      onChange={(e) => setStatement(e.target.value)}
-                      placeholder="وصف مختصر للمعاملة أو الغرض من عرض السعر..."
-                      rows={3}
-                      className={cn(
-                        "flex w-full rounded-md border border-input bg-background px-4 py-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[88px]"
-                      )}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">عملة المستند</p>
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="radio"
-                        name="document-currency"
-                        className="h-4 w-4"
-                        checked={documentCurrency === "USD"}
-                        onChange={() => setDocumentCurrency("USD")}
-                      />
-                      الدولار الأمريكي (USD)
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="radio"
-                        name="document-currency"
-                        className="h-4 w-4"
-                        checked={documentCurrency === "SYP"}
-                        onChange={() => setDocumentCurrency("SYP")}
-                      />
-                      الليرة السورية الجديدة (ل.س)
-                    </label>
-                  </div>
-                  {documentCurrency === "SYP" && (
-                    <div className="pt-1">
-                      <label htmlFor="inv-syp-rate" className="mb-1 block text-sm text-muted-foreground">
-                        سعر صرف الدولار (ل.س لكل 1 USD)
-                      </label>
-                      <Input
-                        id="inv-syp-rate"
-                        value={usdRate}
-                        onChange={(e) => setUsdRate(e.target.value)}
-                        inputMode="numeric"
-                        className="min-h-[44px] max-w-xs tabular-nums"
-                      />
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        تُحوَّل أسعار الهدايا من الكتالوج (USD) تلقائياً. أدخل البنود اليدوية بالليرة مباشرة.
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2 border-t pt-3">
-                  <p className="text-sm text-muted-foreground">طريقة السداد (تظهر في PDF وسجل الفواتير)</p>
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="radio"
-                        name="payment-terms"
-                        className="h-4 w-4"
-                        checked={paymentTerms === "cash"}
-                        onChange={() => setPaymentTerms("cash")}
-                      />
-                      نقدي
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="radio"
-                        name="payment-terms"
-                        className="h-4 w-4"
-                        checked={paymentTerms === "deferred"}
-                        onChange={() => setPaymentTerms("deferred")}
-                      />
-                      مؤجل
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative">
-                <Search className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                <Input
-                  type="text"
-                  placeholder="بحث (الاسم / SKU / slug)..."
-                  value={adminQuery}
-                  onChange={(e) => setAdminQuery(e.target.value)}
-                  className="pr-10 min-h-[44px] text-base"
-                />
-              </div>
-
-              {adminQuery.trim() !== "" && (
-                <Card className="border-dashed">
-                  <CardHeader className="py-4">
-                    <CardTitle className="text-base">نتائج البحث</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {adminSearchResults.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">لا توجد نتائج.</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {adminSearchResults.map((p) => {
-                          const already = quoteLines.some((x) => x.kind === "product" && x.slug === p.slug);
-                          return (
-                            <li key={p.slug} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3">
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">{p.name}</div>
-                                <div className="mt-1 flex flex-wrap gap-2">
-                                  <Badge variant="outline">كود: {p.sku}</Badge>
-                                  <Badge variant="outline">السعر: {formatCustomerFacingPrice(p)}</Badge>
-                                </div>
-                              </div>
-                              <Button type="button" onClick={() => addQuoteLine(p.slug)} disabled={already} className="min-h-[44px] shrink-0">
-                                <Plus className="ml-2 h-5 w-5" />
-                                {already ? "مضاف" : "إضافة"}
-                              </Button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              <Card className="border-primary/25">
-                <CardHeader className="py-4">
-                  <CardTitle className="text-base">بند يدوي (غير مضاف للموقع)</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    أدخل اسماً وسعراً وكمية دون إنشاء منتج في الكتالوج — يظهر في الحاسبة وفي PDF مثل باقي البنود.
-                  </p>
-                </CardHeader>
-                <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="sm:col-span-2">
-                    <label htmlFor="custom-line-name" className="mb-1 block text-sm text-muted-foreground">
-                      اسم البند
-                    </label>
-                    <Input
-                      id="custom-line-name"
-                      value={customNameDraft}
-                      onChange={(e) => setCustomNameDraft(e.target.value)}
-                      placeholder="مثال: تغليف خاص"
-                      className="min-h-[44px]"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="custom-line-price" className="mb-1 block text-sm text-muted-foreground">
-                      {documentCurrency === "SYP" ? "السعر (ل.س)" : "السعر (USD)"}
-                    </label>
-                    <Input
-                      id="custom-line-price"
-                      value={customPriceDraft}
-                      onChange={(e) => setCustomPriceDraft(e.target.value)}
-                      placeholder={
-                        documentCurrency === "SYP"
-                          ? "مثال: 150000 أو 150000 ل.س"
-                          : "مثال: 12.50 أو 12.50 USD"
-                      }
-                      inputMode="decimal"
-                      className="min-h-[44px]"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="custom-line-qty" className="mb-1 block text-sm text-muted-foreground">
-                      العدد
-                    </label>
-                    <Input
-                      id="custom-line-qty"
-                      value={customQtyDraft}
-                      onChange={(e) => setCustomQtyDraft(e.target.value)}
-                      inputMode="numeric"
-                      className="min-h-[44px]"
-                    />
-                  </div>
-                  <div className="sm:col-span-2 lg:col-span-4">
-                    <Button type="button" className="min-h-[44px]" onClick={() => addCustomToQuote()}>
-                      <Plus className="ml-2 h-4 w-4" />
-                      إضافة للحاسبة
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="py-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle className="text-base">حاسبة الأسعار</CardTitle>
-                    {!invoiceEditOpen && (
-                      <Button
-                        type="button"
-                        onClick={() => void downloadQuotePdf()}
-                        disabled={quotePdfLoading || quoteComputed.lines.length === 0}
-                        className="min-h-[44px]"
-                      >
-                        <FileText className="ml-2 h-4 w-4" />
-                        {quotePdfLoading ? "جاري إنشاء PDF..." : "تحميل PDF"}
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {quoteComputed.lines.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">لا توجد بنود في الحاسبة بعد.</p>
-                  ) : (
-                    <>
-                      <div className="overflow-x-auto rounded-md border" style={{ WebkitOverflowScrolling: "touch" }}>
-                        <table className="w-full min-w-[760px] text-right text-sm">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="p-3 w-10">#</th>
-                              <th className="p-3 w-24">المصدر</th>
-                              <th className="p-3">الاسم</th>
-                              <th className="p-3 w-24">SKU</th>
-                              <th className="p-3 min-w-[120px]">السعر الفردي</th>
-                              <th className="p-3 w-28">الكمية</th>
-                              <th className="p-3 w-28">الإجمالي</th>
-                              <th className="p-3 w-16">حذف</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {quoteComputed.lines.map((l, idx) => {
-                              const rawCustom =
-                                l.lineKind === "custom" && l.customId
-                                  ? (quoteLines.find((x) => x.kind === "custom" && x.id === l.customId) as QuoteCustomLine | undefined)
-                                  : undefined;
-                              return (
-                                <tr key={l.rowKey} className="border-t align-middle">
-                                  <td className="p-3">{idx + 1}</td>
-                                  <td className="p-3">
-                                    {l.lineKind === "custom" ? (
-                                      <Badge variant="secondary">يدوي</Badge>
-                                    ) : (
-                                      <Badge variant="outline">موقع</Badge>
-                                    )}
-                                  </td>
-                                  <td className="p-3">
-                                    {l.lineKind === "custom" && l.customId ? (
-                                      <Input
-                                        value={rawCustom?.name ?? ""}
-                                        onChange={(e) => setCustomLineName(l.customId!, e.target.value)}
-                                        className="min-h-[44px] font-medium"
-                                      />
-                                    ) : (
-                                      <span className="font-medium">{l.name}</span>
-                                    )}
-                                  </td>
-                                  <td className="p-3">{l.sku || "—"}</td>
-                                  <td className="p-3">
-                                    {l.lineKind === "custom" && l.customId ? (
-                                      <Input
-                                        value={rawCustom?.unitPriceInput ?? ""}
-                                        onChange={(e) => setCustomLinePriceInput(l.customId!, e.target.value)}
-                                        inputMode="decimal"
-                                        className="min-h-[44px] tabular-nums"
-                                        placeholder={documentCurrency === "SYP" ? "ل.س" : "USD"}
-                                      />
-                                    ) : (
-                                      l.unitPriceText || "—"
-                                    )}
-                                  </td>
-                                  <td className="p-3">
-                                    <Input
-                                      value={String(l.qty)}
-                                      onChange={(e) => setQuoteQty(l.rowKey, l.lineKind, e.target.value)}
-                                      inputMode="numeric"
-                                      className="min-h-[44px] w-28 text-center tabular-nums"
-                                    />
-                                  </td>
-                                  <td className="p-3 tabular-nums">
-                                    {l.lineTotal > 0
-                                      ? quoteComputed.isSyp
-                                        ? formatSypCalculatorDisplay(l.lineTotal)
-                                        : formatUsdCalculatorDisplay(l.lineTotal)
-                                      : "—"}
-                                  </td>
-                                  <td className="p-3">
-                                    <Button
-                                      type="button"
-                                      variant="destructive"
-                                      size="sm"
-                                      className="min-h-[44px]"
-                                      onClick={() => removeQuoteLine(l.rowKey, l.lineKind)}
-                                    >
-                                      <X className="h-4 w-4" />
-                                      <span className="sr-only">حذف</span>
-                                    </Button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="mt-4 flex items-center justify-between rounded-md border bg-muted/30 px-4 py-3">
-                        <div className="text-sm text-muted-foreground">المجموع النهائي</div>
-                        <div className="text-lg font-bold tabular-nums">{quoteComputed.isSyp
-                            ? formatSypCalculatorDisplay(quoteComputed.grandTotal)
-                            : formatUsdCalculatorDisplay(quoteComputed.grandTotal)}</div>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </CardContent>
-          </Card>
             </>
           )}
 
