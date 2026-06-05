@@ -23,7 +23,7 @@
  */
 const defaultLogoPath = "/new-logo.png";
 const defaultPdfLogoPath = "/logo_pdf.png";
-const defaultIconPath = "/new-logo-icon.ico";
+const defaultIconPath = "/new-logo-icon.png";
 
 function resolveLogoPath(): string {
   const fromEnv =
