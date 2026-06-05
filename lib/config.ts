@@ -21,9 +21,9 @@
  *  هـ) ملفات PDF تقرأ pdfLogoPath (افتراضيًا /logo_pdf.png).
  * ═══════════════════════════════════════════════════════════════════════════
  */
-const defaultLogoPath = "/new-logo.png";
-const defaultPdfLogoPath = "/logo_pdf.png";
-const defaultIconPath = "/new-logo-icon.png";
+const defaultLogoPath = "/logo.png";
+const defaultPdfLogoPath = "/logo.png";
+const defaultIconPath = "/icon.ico";
 
 function resolveLogoPath(): string {
   const fromEnv =

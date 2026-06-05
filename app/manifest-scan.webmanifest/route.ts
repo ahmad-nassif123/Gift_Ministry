@@ -19,7 +19,7 @@ export async function GET() {
       {
         src: siteConfig.iconPath,
         sizes: "any",
-        type: "image/png",
+        type: "image/x-icon",
         purpose: "any",
       },
     ],
