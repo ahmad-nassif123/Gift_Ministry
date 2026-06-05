@@ -1,5 +1,6 @@
 import { sql } from "@vercel/postgres";
 import { products as initialProducts, type Product, type GiftTier } from "@/data/products";
+import type { CatalogScope } from "@/lib/catalog-scope";
 
 const PRODUCTS_TABLE = "products";
 
@@ -53,6 +54,11 @@ export async function ensureProductsTable(): Promise<void> {
     } catch {
       /* موجود */
     }
+    try {
+      await sql`ALTER TABLE products ADD COLUMN is_private BOOLEAN NOT NULL DEFAULT false`;
+    } catch {
+      /* العمود موجود مسبقاً */
+    }
     await sql`
       CREATE TABLE IF NOT EXISTS catalog_slug_suppressions (
         slug VARCHAR(255) PRIMARY KEY,
@@ -85,6 +91,7 @@ function rowToProduct(r: Record<string, unknown>): Product {
         : undefined,
     archived: Boolean(r.archived),
     hidden: Boolean((r as any).hidden),
+    isPrivate: Boolean((r as { is_private?: unknown }).is_private),
     createdAt: r.created_at != null ? String((r as any).created_at) : undefined,
     updatedAt: r.updated_at != null ? String((r as any).updated_at) : undefined,
   };
@@ -159,7 +166,11 @@ export async function syncInitialProducts(): Promise<void> {
   }
 }
 
-export async function getAllProducts(includeArchived = false, includeHidden = false): Promise<Product[]> {
+export async function getAllProducts(
+  includeArchived = false,
+  includeHidden = false,
+  catalogScope?: CatalogScope
+): Promise<Product[]> {
   await ensureProductsTable();
   const { rows } = includeArchived
     ? includeHidden
@@ -168,7 +179,13 @@ export async function getAllProducts(includeArchived = false, includeHidden = fa
     : includeHidden
       ? await sql`SELECT * FROM products WHERE (archived IS NULL OR archived = false) ORDER BY hidden ASC, sku`
       : await sql`SELECT * FROM products WHERE (archived IS NULL OR archived = false) AND (hidden IS NULL OR hidden = false) ORDER BY sku`;
-  return rows.map(rowToProduct);
+  let products = rows.map(rowToProduct);
+  if (catalogScope === "public") {
+    products = products.filter((p) => !p.isPrivate);
+  } else if (catalogScope === "private") {
+    products = products.filter((p) => p.isPrivate);
+  }
+  return products;
 }
 
 export async function getProductBySku(sku: string): Promise<Product | null> {
@@ -207,7 +224,7 @@ export async function createProduct(p: Product): Promise<Product> {
   await ensureProductsTable();
   await sql`DELETE FROM catalog_slug_suppressions WHERE slug = ${p.slug}`;
   await sql`
-    INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, sale_price, pricing_detail, archived, hidden, updated_at)
+    INSERT INTO products (slug, sku, name, short_description, contents, gift_tier, images, catalog_image, available_quantity, price, sale_price, pricing_detail, archived, hidden, is_private, updated_at)
     VALUES (
       ${p.slug},
       ${p.sku},
@@ -223,6 +240,7 @@ export async function createProduct(p: Product): Promise<Product> {
       ${p.pricingDetail ?? null},
       ${p.archived ?? false},
       ${p.hidden ?? false},
+      ${p.isPrivate ?? false},
       NOW()
     )
   `;
@@ -265,6 +283,7 @@ export async function updateProduct(slug: string, updates: ProductUpdateInput): 
   const detailClearFlag = setDetailNull ? 1 : 0;
   const archived = updates.archived !== undefined ? updates.archived : null;
   const hidden = updates.hidden !== undefined ? updates.hidden : null;
+  const isPrivate = updates.isPrivate !== undefined ? updates.isPrivate : null;
 
   const { rows } = await sql`
     UPDATE products AS p SET
@@ -281,6 +300,7 @@ export async function updateProduct(slug: string, updates: ProductUpdateInput): 
       pricing_detail = CASE WHEN ${detailClearFlag} = 1 THEN NULL ELSE COALESCE(${detailCoalesce}, p.pricing_detail) END,
       archived = COALESCE(${archived}, p.archived),
       hidden = COALESCE(${hidden}, p.hidden),
+      is_private = COALESCE(${isPrivate}, p.is_private),
       updated_at = NOW()
     WHERE p.slug = ${slug}
     RETURNING *
@@ -303,6 +323,13 @@ export async function deleteProduct(slug: string): Promise<boolean> {
     ON CONFLICT (slug) DO NOTHING
   `;
   return true;
+}
+
+/** حذف جميع الهدايا من القاعدة */
+export async function deleteAllProducts(): Promise<number> {
+  await ensureProductsTable();
+  const { rowCount } = await sql`DELETE FROM products`;
+  return rowCount ?? 0;
 }
 
 export function isProductsDbConfigured(): boolean {

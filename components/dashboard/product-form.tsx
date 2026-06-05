@@ -80,6 +80,7 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
         catalogImage: product.catalogImage ?? "",
         availableQuantity: product.availableQuantity || 0,
         archived: product.archived,
+        isPrivate: product.isPrivate ?? false,
       });
     } else {
       // منتج جديد - توليد SKU تلقائياً
@@ -92,6 +93,7 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
         images: [],
         catalogImage: "",
         availableQuantity: 0,
+        isPrivate: false,
       });
       void loadNextSku();
     }
@@ -354,6 +356,25 @@ export function ProductForm({ product, onClose, onSubmit }: ProductFormProps) {
                 </Badge>
               ))}
             </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={Boolean(formData.isPrivate)}
+                onChange={(e) =>
+                  setFormData({ ...formData, isPrivate: e.target.checked })
+                }
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <span className="block text-sm font-medium">هدية خاصة</span>
+                <span className="block text-xs text-muted-foreground">
+                  تظهر في تبويب «الهدايا الخاصة» فقط وليس في الصفحة العامة
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* المحتويات */}

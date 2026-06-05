@@ -45,7 +45,7 @@ function compareProductsForCatalog(a: Product, b: Product): number {
 }
 
 function orderPresentationSlides(products: Product[]): Product[] {
-  const visible = products.filter((p) => !p.hidden);
+  const visible = products.filter((p) => !p.hidden && !p.isPrivate);
   const archive = visible
     .filter(isArchiveCatalogProduct)
     .slice()
@@ -60,7 +60,7 @@ function orderPresentationSlides(products: Product[]): Product[] {
 export default function PresentPage() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [slides, setSlides] = useState<Product[]>(() =>
-    orderPresentationSlides(initialProducts.filter((p) => !p.archived && !p.hidden))
+    orderPresentationSlides(initialProducts.filter((p) => !p.archived && !p.hidden && !p.isPrivate))
   );
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);

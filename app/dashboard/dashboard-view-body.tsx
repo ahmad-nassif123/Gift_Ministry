@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Edit, Trash2, Search, LogOut, Download, Upload, BarChart3, ClipboardList, FileText, QrCode, DownloadCloud, RefreshCw, AlertTriangle, RotateCcw, Printer, Eye, EyeOff, Sheet, Warehouse, KeyRound } from "lucide-react";
+import { Plus, Edit, Trash2, Search, LogOut, Download, Upload, BarChart3, ClipboardList, FileText, QrCode, DownloadCloud, RefreshCw, AlertTriangle, RotateCcw, Printer, Eye, EyeOff, Sheet, Warehouse, KeyRound, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,7 @@ export function DashboardViewBody(props: DashboardViewReturnProps) {
     handleEditProduct,
     handleDeleteProduct,
       handleToggleHidden,
+      handleTogglePrivate,
     handleExportGiftsExcel,
     handleImportGiftsExcel,
     giftsExcelImporting,
@@ -559,6 +560,11 @@ export function DashboardViewBody(props: DashboardViewReturnProps) {
                         <div className="flex flex-wrap gap-2">
                           <Badge variant="outline">كود: {product.sku}</Badge>
                           <Badge variant="outline">العدد: {product.availableQuantity ?? 0}</Badge>
+                          {product.isPrivate && (
+                            <Badge variant="secondary" className="bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
+                              خاصة
+                            </Badge>
+                          )}
                           {product.hidden && (
                             <Badge variant="secondary" className="bg-slate-200 text-slate-800 dark:bg-slate-900/40 dark:text-slate-200">
                               مخفي عن الموقع
@@ -610,6 +616,19 @@ export function DashboardViewBody(props: DashboardViewReturnProps) {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      <Button
+                        variant="outline"
+                        className="min-h-[44px] flex-1 touch-manipulation"
+                        onClick={() => {
+                          if (typeof handleTogglePrivate === "function") {
+                            void handleTogglePrivate(product.slug, !product.isPrivate);
+                          }
+                        }}
+                        title={product.isPrivate ? "نقل إلى الهدايا العامة" : "نقل إلى الهدايا الخاصة"}
+                      >
+                        <Star className="ml-2 h-4 w-4 shrink-0" />
+                        {product.isPrivate ? "عامة" : "خاصة"}
+                      </Button>
                       <Button
                         variant="outline"
                         className="min-h-[44px] flex-1 touch-manipulation"

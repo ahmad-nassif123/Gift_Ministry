@@ -1,17 +1,17 @@
 import { products as initialProducts, type Product } from "@/data/products";
+import {
+  catalogStorageKey,
+  filterProductsByCatalogScope,
+  type CatalogScope,
+} from "@/lib/catalog-scope";
 
 export const PRODUCTS_STORAGE_KEY = "products";
 
-/**
- * للعرض العام (الموقع، البحث، صفحة المنتج، الطلبية):
- * قراءة localStorage دون دمجها مع القائمة الثابتة — لأن الدمج كان يُعيد ظهور المنتجات
- * المؤرشفة من لوحة التحكم (الحذف الناعم) ما دامت لا تزال في data/products.ts.
- */
-export function loadPublicProductsFromLocalStorage(): Product[] {
-  const fallback = () => initialProducts.filter((p) => !p.archived && !p.hidden);
+export function loadCatalogProductsFromLocalStorage(scope: CatalogScope = "public"): Product[] {
+  const fallback = () => filterProductsByCatalogScope(initialProducts, scope);
   if (typeof window === "undefined") return fallback();
   try {
-    const saved = localStorage.getItem(PRODUCTS_STORAGE_KEY);
+    const saved = localStorage.getItem(catalogStorageKey(scope));
     if (!saved) return fallback();
     const parsed = JSON.parse(saved) as unknown;
     if (!Array.isArray(parsed)) return fallback();
@@ -26,6 +26,11 @@ export function loadPublicProductsFromLocalStorage(): Product[] {
   } catch {
     return fallback();
   }
+}
+
+/** @deprecated استخدم loadCatalogProductsFromLocalStorage */
+export function loadPublicProductsFromLocalStorage(): Product[] {
+  return loadCatalogProductsFromLocalStorage("public");
 }
 
 export function notifyProductsStorageChanged(): void {

@@ -9,12 +9,14 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  deleteAllProducts,
   getNextAvailableSku,
 } from "@/lib/products-db";
 import { isPricingGateOpen } from "@/lib/admin-pricing-session";
 import { getSession } from "@/lib/auth-session";
 import { stripProductsPricesForPublic } from "@/lib/product-public";
 import { generateProductSlug } from "@/lib/slug";
+import type { CatalogScope } from "@/lib/catalog-scope";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -33,12 +35,19 @@ async function mayExposeProductPrices(): Promise<boolean> {
 export async function GET(request: NextRequest) {
   try {
     const showPrices = await mayExposeProductPrices();
+    const { searchParams } = new URL(request.url);
+    const scopeParam = searchParams.get("scope");
+    const catalogScope: CatalogScope | undefined =
+      scopeParam === "private" ? "private" : scopeParam === "public" ? "public" : undefined;
 
     if (!isProductsDbConfigured()) {
-      const data = showPrices ? staticProducts : stripProductsPricesForPublic(staticProducts);
+      const resolvedScope = catalogScope ?? "public";
+      const scopedStatic = staticProducts.filter((p) =>
+        resolvedScope === "private" ? p.isPrivate : !p.isPrivate
+      );
+      const data = showPrices ? scopedStatic : stripProductsPricesForPublic(scopedStatic);
       return NextResponse.json({ success: true, data }, { headers: NO_STORE_HEADERS });
     }
-    const { searchParams } = new URL(request.url);
     const includeArchived = searchParams.get("include_archived") === "1" || searchParams.get("include_archived") === "true";
     const includeHidden = searchParams.get("include_hidden") === "1" || searchParams.get("include_hidden") === "true";
     /** quick=1: جلب سريع للداشبورد — يتخطى syncInitialProducts (حلقة إدراج لكل منتج أولي) */
@@ -48,7 +57,9 @@ export async function GET(request: NextRequest) {
     if (!quick) {
       await syncInitialProducts();
     }
-    let data = await getAllProducts(includeArchived, includeHidden);
+    const resolvedScope =
+      catalogScope ?? (!includeArchived && !includeHidden ? ("public" as const) : undefined);
+    let data = await getAllProducts(includeArchived, includeHidden, resolvedScope);
     if (!showPrices) {
       data = stripProductsPricesForPublic(data);
     }
@@ -93,6 +104,7 @@ export async function POST(request: NextRequest) {
       price: body.price,
       salePrice: typeof body.salePrice === "string" ? body.salePrice : undefined,
       pricingDetail: typeof body.pricingDetail === "string" ? body.pricingDetail : undefined,
+      isPrivate: Boolean(body.isPrivate),
     };
     await ensureProductsTable();
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -164,6 +176,7 @@ export async function PUT(request: NextRequest) {
       pricingDetail: body.pricingDetail,
       archived: body.archived,
       hidden: body.hidden,
+      isPrivate: body.isPrivate,
     };
     await ensureProductsTable();
     const updated = await updateProduct(slug, updatedData);
@@ -204,6 +217,16 @@ export async function DELETE(request: NextRequest) {
       );
     }
     const { searchParams } = new URL(request.url);
+    const deleteAll = searchParams.get("all") === "1" || searchParams.get("all") === "true";
+    if (deleteAll) {
+      await ensureProductsTable();
+      const deletedCount = await deleteAllProducts();
+      return NextResponse.json({
+        success: true,
+        message: `تم حذف ${deletedCount} هدية`,
+        deletedCount,
+      });
+    }
     const slug = searchParams.get("slug");
     if (!slug) {
       return NextResponse.json(

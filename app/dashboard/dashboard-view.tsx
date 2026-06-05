@@ -219,6 +219,7 @@ export function DashboardView() {
         images: Array.isArray(product.images) ? product.images : [],
         catalogImage: typeof product.catalogImage === "string" ? product.catalogImage : undefined,
         availableQuantity: product.availableQuantity ?? 0,
+        isPrivate: Boolean(product.isPrivate),
       };
       const response = await fetch("/api/products", {
         method: isEdit ? "PUT" : "POST",
@@ -667,6 +668,31 @@ export function DashboardView() {
     }
   };
 
+  const handleTogglePrivate = async (slug: string, isPrivate: boolean) => {
+    try {
+      const response = await fetch("/api/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ slug, isPrivate }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        await refetchProducts(true);
+        return;
+      }
+      if (response.status === 401) {
+        notifyError(result.error || "انتهت الجلسة. سجّل الدخول مرة أخرى.");
+        router.replace("/login?next=/dashboard");
+        return;
+      }
+      notifyError(result.error || "تعذر تحديث نوع العرض");
+    } catch (e) {
+      console.error(e);
+      notifyError("تعذر تحديث نوع العرض");
+    }
+  };
+
   const extra = (
         <>
           {isFormOpen && (
@@ -721,6 +747,7 @@ export function DashboardView() {
     handleEditProduct,
     handleDeleteProduct,
     handleToggleHidden,
+    handleTogglePrivate,
     handleFormSubmit,
     handleExportGiftsExcel,
     handleImportGiftsExcel,
