@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Calculator, Menu, MonitorPlay } from "lucide-react";
+import { Menu, MonitorPlay } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -20,14 +20,14 @@ export function Navbar() {
     <nav className="no-print lux-chrome-header sticky top-0 z-50 w-full backdrop-blur supports-[backdrop-filter]:bg-background/50">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex min-w-0 max-w-[55%] items-center gap-2 sm:gap-3 md:max-w-none">
-          <div className="relative h-9 w-40 shrink-0 sm:h-10 sm:w-48 md:h-11 md:w-56">
+          <div className="relative h-7 w-28 shrink-0 sm:h-8 sm:w-32 md:h-9 md:w-36">
             <Image
               src={siteConfig.logoPath}
               alt={siteConfig.logoAlt}
               fill
               className="object-contain object-center text-[0px]"
               priority
-              sizes="(max-width: 768px) 160px, 224px"
+              sizes="(max-width: 768px) 112px, 144px"
             />
           </div>
         </Link>
@@ -39,13 +39,6 @@ export function Navbar() {
             className="flex flex-col w-fit h-[29px] text-base font-medium transition-colors hover:text-brand-green-dark"
           >
             الهدايا
-          </Link>
-          <Link
-            href="/admin/pricing"
-            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-brand-green-dark"
-          >
-            <Calculator className="h-4 w-4 shrink-0" aria-hidden />
-            الإدارة
           </Link>
           <Link
             href="/present"
@@ -84,14 +77,6 @@ export function Navbar() {
                 className="text-lg font-medium transition-colors hover:text-brand-green-dark"
               >
                 الهدايا
-              </Link>
-              <Link
-                href="/admin/pricing"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-2 text-lg font-medium text-muted-foreground transition-colors hover:text-brand-green-dark"
-              >
-                <Calculator className="h-5 w-5 shrink-0" aria-hidden />
-                الإدارة
               </Link>
               <Link
                 href="/present"

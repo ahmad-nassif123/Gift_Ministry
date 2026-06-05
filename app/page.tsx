@@ -231,7 +231,7 @@ function HomeContent() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...catalogTransition, duration: 0.72 }}
-              className="w-full max-w-lg sm:max-w-2xl md:max-w-3xl"
+              className="w-full max-w-xs sm:max-w-sm md:max-w-md"
             >
               <Image
                 src={siteConfig.logoPath}
