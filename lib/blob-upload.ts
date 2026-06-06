@@ -21,12 +21,25 @@ function blobOidcToken(): string | undefined {
   return raw || undefined;
 }
 
+/** public = مخزن عام | private = مخزن Private (مثل gift-ministry-blob) */
+function blobAccessMode(): "public" | "private" {
+  const mode = process.env.BLOB_ACCESS?.trim().toLowerCase();
+  if (mode === "public") return "public";
+  if (mode === "private") return "private";
+  // وجود BLOB_STORE_ID يعني مخزناً مربوطاً — gift-ministry-blob خاص ويتطلب private
+  if (blobStoreId()) return "private";
+  return "public";
+}
+
 /** خيارات المصادقة لـ @vercel/blob (توكن ثابت أو OIDC) */
 export function getBlobAuthOptions(): BlobAuthOptions | null {
   const token = blobReadWriteToken();
-  if (token) return { token };
-
   const storeId = blobStoreId();
+
+  if (token) {
+    return storeId ? { token, storeId } : { token };
+  }
+
   const oidcToken = blobOidcToken();
   if (storeId && oidcToken) {
     return { storeId, oidcToken };
@@ -39,9 +52,8 @@ export function isBlobStorageConfigured(): boolean {
   return Boolean(getBlobAuthOptions() || blobStoreId());
 }
 
-/** مخزن OIDC (Private Store) بدون توكن ثابت */
 export function usesPrivateBlobStore(): boolean {
-  return Boolean(blobStoreId() && !blobReadWriteToken());
+  return blobAccessMode() === "private";
 }
 
 export function toPublicMediaUrl(blob: PutBlobResult): string {
@@ -55,15 +67,14 @@ export async function uploadProductImage(file: File, fileName: string): Promise<
   const auth = getBlobAuthOptions();
   if (!auth) {
     throw new Error(
-      "لم يُعثَر على مصادقة Vercel Blob. أضف BLOB_READ_WRITE_TOKEN من Storage → Blob → Tokens، أو Redeploy بعد ربط المخزن بـ OIDC."
+      "لم يُعثَر على مصادقة Vercel Blob. أضف BLOB_READ_WRITE_TOKEN من Storage → Blob → Restore Token، ثم Redeploy."
     );
   }
 
   const pathname = `product-uploads/${fileName}`;
-  const access = usesPrivateBlobStore() ? ("private" as const) : ("public" as const);
 
   return put(pathname, file, {
-    access,
+    access: blobAccessMode(),
     addRandomSuffix: false,
     ...auth,
   });
