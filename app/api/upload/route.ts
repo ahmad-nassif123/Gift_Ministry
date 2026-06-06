@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
-import { put } from "@vercel/blob";
 import { getSession } from "@/lib/auth-session";
+import {
+  isBlobStorageConfigured,
+  uploadProductImage,
+  toPublicMediaUrl,
+  uploadErrorMessage,
+} from "@/lib/blob-upload";
 
 export const runtime = "nodejs";
 
@@ -11,19 +16,6 @@ function buildSafeFileName(original: string): string {
   const timestamp = Date.now();
   const originalName = original.replace(/[^a-zA-Z0-9.\u0600-\u06FF]/g, "-");
   return `${timestamp}-${originalName || "image"}`;
-}
-
-function isBlobConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim() || process.env.BLOB_STORE_ID?.trim());
-}
-
-function blobPutOptions() {
-  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-  return {
-    access: "public" as const,
-    addRandomSuffix: false,
-    ...(token ? { token } : {}),
-  };
 }
 
 export async function POST(request: NextRequest) {
@@ -53,7 +45,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // صور الكتالوج للطباعة قد تكون كبيرة (HD)
     const maxSize = 25 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json(
@@ -64,13 +55,12 @@ export async function POST(request: NextRequest) {
 
     const fileName = buildSafeFileName(file.name);
 
-    /** على Vercel: Blob عبر BLOB_STORE_ID (OIDC) أو BLOB_READ_WRITE_TOKEN */
-    if (isBlobConfigured()) {
-      const blob = await put(`product-uploads/${fileName}`, file, blobPutOptions());
+    if (isBlobStorageConfigured()) {
+      const blob = await uploadProductImage(file, fileName);
       return NextResponse.json({
         success: true,
         message: "تم رفع الصورة بنجاح",
-        url: blob.url,
+        url: toPublicMediaUrl(blob),
       });
     }
 
@@ -95,17 +85,15 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
 
-    const imageUrl = `/images/${fileName}`;
-
     return NextResponse.json({
       success: true,
       message: "تم رفع الصورة بنجاح",
-      url: imageUrl,
+      url: `/images/${fileName}`,
     });
   } catch (error) {
     console.error("Error uploading file:", error);
     return NextResponse.json(
-      { success: false, error: "فشل في رفع الصورة" },
+      { success: false, error: uploadErrorMessage(error) },
       { status: 500 }
     );
   }
