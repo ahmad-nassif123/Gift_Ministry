@@ -1,5 +1,11 @@
 import { put, type PutBlobResult } from "@vercel/blob";
 
+export type BlobAuthOptions = {
+  token?: string;
+  storeId?: string;
+  oidcToken?: string;
+};
+
 function blobStoreId(): string | undefined {
   const raw = process.env.BLOB_STORE_ID?.trim();
   return raw || undefined;
@@ -10,11 +16,30 @@ function blobReadWriteToken(): string | undefined {
   return raw || undefined;
 }
 
-export function isBlobStorageConfigured(): boolean {
-  return Boolean(blobReadWriteToken() || blobStoreId());
+function blobOidcToken(): string | undefined {
+  const raw = process.env.VERCEL_OIDC_TOKEN?.trim();
+  return raw || undefined;
 }
 
-/** مخزن OIDC (Private Store) — لا يقبل access: public */
+/** خيارات المصادقة لـ @vercel/blob (توكن ثابت أو OIDC) */
+export function getBlobAuthOptions(): BlobAuthOptions | null {
+  const token = blobReadWriteToken();
+  if (token) return { token };
+
+  const storeId = blobStoreId();
+  const oidcToken = blobOidcToken();
+  if (storeId && oidcToken) {
+    return { storeId, oidcToken };
+  }
+
+  return null;
+}
+
+export function isBlobStorageConfigured(): boolean {
+  return Boolean(getBlobAuthOptions() || blobStoreId());
+}
+
+/** مخزن OIDC (Private Store) بدون توكن ثابت */
 export function usesPrivateBlobStore(): boolean {
   return Boolean(blobStoreId() && !blobReadWriteToken());
 }
@@ -27,26 +52,26 @@ export function toPublicMediaUrl(blob: PutBlobResult): string {
 }
 
 export async function uploadProductImage(file: File, fileName: string): Promise<PutBlobResult> {
+  const auth = getBlobAuthOptions();
+  if (!auth) {
+    throw new Error(
+      "لم يُعثَر على مصادقة Vercel Blob. أضف BLOB_READ_WRITE_TOKEN من Storage → Blob → Tokens، أو Redeploy بعد ربط المخزن بـ OIDC."
+    );
+  }
+
   const pathname = `product-uploads/${fileName}`;
-  const token = blobReadWriteToken();
-  const storeId = blobStoreId();
   const access = usesPrivateBlobStore() ? ("private" as const) : ("public" as const);
 
   return put(pathname, file, {
     access,
     addRandomSuffix: false,
-    ...(token ? { token } : {}),
-    ...(storeId ? { storeId } : {}),
+    ...auth,
   });
 }
 
 export function uploadErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
-    const msg = error.message.trim();
-    if (/private/i.test(msg) && /public/i.test(msg)) {
-      return "مخزن Blob خاص: تم ضبط الرفع تلقائياً. أعد المحاولة بعد نشر آخر تحديث.";
-    }
-    return msg;
+    return error.message.trim();
   }
   return "فشل في رفع الصورة";
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { get } from "@vercel/blob";
-import { usesPrivateBlobStore } from "@/lib/blob-upload";
+import { getBlobAuthOptions, usesPrivateBlobStore } from "@/lib/blob-upload";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,15 +11,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    const auth = getBlobAuthOptions();
+    if (!auth) {
+      return NextResponse.json({ error: "Blob auth not configured" }, { status: 503 });
+    }
+
     const pathname = request.nextUrl.searchParams.get("pathname")?.trim();
     if (!pathname || pathname.includes("..")) {
       return NextResponse.json({ error: "Invalid pathname" }, { status: 400 });
     }
 
-    const storeId = process.env.BLOB_STORE_ID?.trim();
     const result = await get(pathname, {
       access: "private",
-      ...(storeId ? { storeId } : {}),
+      ...auth,
     });
 
     if (!result || result.statusCode !== 200 || !result.stream) {
