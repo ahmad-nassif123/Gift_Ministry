@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            "تسجيل الدخول غير مفعّل على الخادم: أضف ADMIN_PASSWORD في Vercel أو عيّن كلمة مرور من صفحة «تغيير كلمة المرور» بعد ربط POSTGRES_URL، ثم نفّذ Redeploy.",
+            "تسجيل الدخول غير مفعّل على الخادم: أضف ADMIN_PASSWORD في Vercel ثم نفّذ Redeploy.",
         },
         { status: 503 }
       );

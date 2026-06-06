@@ -1,11 +1,6 @@
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import crypto from "crypto";
-import { verifyAdminPasswordHash } from "@/lib/admin-password";
-import {
-  getDashboardPasswordOverrideHash,
-  hasDashboardPasswordOverride,
-} from "@/lib/dashboard-password-db";
 
 const COOKIE_NAME = "admin_session";
 /** جلسة عادية (بدون تذكرني) */
@@ -115,17 +110,6 @@ export function isDashboardLoginConfigured(): boolean {
   return primary.length > 0 || fallback.length > 0;
 }
 
-/** يشمل كلمة المرور المحفوظة في Postgres (صفحة إدارة كلمة المرور) إن وُجدت */
-export async function isDashboardLoginConfiguredAsync(): Promise<boolean> {
-  if (isDashboardLoginConfigured()) return true;
-  try {
-    return await hasDashboardPasswordOverride();
-  } catch {
-    return false;
-  }
-}
-
-/** مطابقة كلمة المرور مع متغيرات البيئة فقط (بدون تجاوز القاعدة) */
 export function authorizeDashboardPassword(password: string): boolean {
   const pass = normalizeLoginPassword(password);
   if (!pass) return false;
@@ -135,77 +119,12 @@ export function authorizeDashboardPassword(password: string): boolean {
   return fallback.length > 0 && pass === fallback;
 }
 
-/**
- * التحقق من كلمة مرور `/login`: إن وُجدت كلمة في القاعدة تُستخدم وحدها؛ وإلا تُستخدم `ADMIN_PASSWORD` / `ADMIN_LOGIN_PASSWORD`.
- */
+/** @deprecated استخدم isDashboardLoginConfigured */
+export async function isDashboardLoginConfiguredAsync(): Promise<boolean> {
+  return isDashboardLoginConfigured();
+}
+
+/** @deprecated استخدم authorizeDashboardPassword */
 export async function verifyDashboardLoginPassword(password: string): Promise<boolean> {
-  const pass = normalizeLoginPassword(password);
-  if (!pass) return false;
-  try {
-    const stored = await getDashboardPasswordOverrideHash();
-    if (stored) return verifyAdminPasswordHash(pass, stored);
-  } catch {
-    // إذا تعذّر الاتصال بالقاعدة نجرّب البيئة كنسخة احتياطية
-  }
   return authorizeDashboardPassword(password);
-}
-
-const DIRECTORY_GATE_COOKIE = "admin_directory_gate";
-const DIRECTORY_GATE_MAX_AGE = 60 * 30; // 30 دقيقة
-
-interface DirectoryGatePayload {
-  exp: number;
-  typ: "admin_directory_gate";
-}
-
-export function createDirectoryGateToken(): string {
-  const payload: DirectoryGatePayload = {
-    exp: Math.floor(Date.now() / 1000) + DIRECTORY_GATE_MAX_AGE,
-    typ: "admin_directory_gate",
-  };
-  const payloadStr = JSON.stringify(payload);
-  const sig = sign(payloadStr);
-  return Buffer.from(payloadStr, "utf-8").toString("base64url") + "." + sig;
-}
-
-export function verifyDirectoryGateToken(token: string | undefined | null): boolean {
-  try {
-    if (!token) return false;
-    const [payloadB64, sig] = token.split(".");
-    if (!payloadB64 || !sig) return false;
-    const payloadStr = Buffer.from(payloadB64, "base64url").toString("utf-8");
-    if (sign(payloadStr) !== sig) return false;
-    const payload = JSON.parse(payloadStr) as DirectoryGatePayload;
-    if (payload.typ !== "admin_directory_gate") return false;
-    if (payload.exp < Math.floor(Date.now() / 1000)) return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function setDirectoryGateCookie(token: string): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.set(DIRECTORY_GATE_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: DIRECTORY_GATE_MAX_AGE,
-    path: "/",
-  });
-}
-
-export async function clearDirectoryGateCookie(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(DIRECTORY_GATE_COOKIE);
-}
-
-export function getDirectoryGatePassword(): string {
-  const v = process.env.ADMIN_DIRECTORY_GATE_PASSWORD?.trim();
-  return v && v.length > 0 ? v : "20002026";
-}
-
-export async function getDirectoryGateCookieValue(): Promise<string | undefined> {
-  const cookieStore = await cookies();
-  return cookieStore.get(DIRECTORY_GATE_COOKIE)?.value;
 }
