@@ -182,8 +182,6 @@ export async function getAllProducts(
   let products = rows.map(rowToProduct);
   if (catalogScope === "public") {
     products = products.filter((p) => !p.isPrivate);
-  } else if (catalogScope === "private") {
-    products = products.filter((p) => p.isPrivate);
   }
   return products;
 }

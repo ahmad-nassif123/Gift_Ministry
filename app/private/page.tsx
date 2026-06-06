@@ -7,7 +7,7 @@ export default function PrivateCatalogPage() {
       <CatalogPageContent
         scope="private"
         title="الهدايا الخاصة"
-        description="مجموعة هدايا مخصصة تعرض في هذا القسم فقط"
+        description="مجموعة الهدايا الكاملة — العامة والخاصة — متاحة بعد تسجيل الدخول"
         productsSectionId="private-products"
       />
     </PrivateCatalogGate>

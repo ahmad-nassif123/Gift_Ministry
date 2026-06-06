@@ -49,9 +49,10 @@ export async function GET(request: NextRequest) {
           { status: 401, headers: NO_STORE_HEADERS }
         );
       }
-      const scopedStatic = staticProducts.filter((p) =>
-        resolvedScope === "private" ? p.isPrivate : !p.isPrivate
-      );
+      const scopedStatic =
+        resolvedScope === "public"
+          ? staticProducts.filter((p) => !p.isPrivate)
+          : staticProducts;
       const data = showPrices ? scopedStatic : stripProductsPricesForPublic(scopedStatic);
       return NextResponse.json({ success: true, data }, { headers: NO_STORE_HEADERS });
     }
