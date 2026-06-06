@@ -6,6 +6,7 @@ export async function fetchCatalogProducts(scope: CatalogScope = "public"): Prom
   try {
     const res = await fetch(`/api/products?scope=${scope}&_=${Date.now()}`, {
       cache: "no-store",
+      credentials: "include",
       headers: {
         Pragma: "no-cache",
         "Cache-Control": "no-cache",

@@ -14,6 +14,7 @@ import {
 } from "@/lib/products-db";
 import { isPricingGateOpen } from "@/lib/admin-pricing-session";
 import { getSession } from "@/lib/auth-session";
+import { canAccessPrivateCatalog } from "@/lib/private-catalog-session";
 import { stripProductsPricesForPublic } from "@/lib/product-public";
 import { generateProductSlug } from "@/lib/slug";
 import type { CatalogScope } from "@/lib/catalog-scope";
@@ -42,6 +43,12 @@ export async function GET(request: NextRequest) {
 
     if (!isProductsDbConfigured()) {
       const resolvedScope = catalogScope ?? "public";
+      if (resolvedScope === "private" && !(await canAccessPrivateCatalog())) {
+        return NextResponse.json(
+          { success: false, error: "يتطلب تسجيل الدخول إلى الهدايا الخاصة" },
+          { status: 401, headers: NO_STORE_HEADERS }
+        );
+      }
       const scopedStatic = staticProducts.filter((p) =>
         resolvedScope === "private" ? p.isPrivate : !p.isPrivate
       );
@@ -59,6 +66,14 @@ export async function GET(request: NextRequest) {
     }
     const resolvedScope =
       catalogScope ?? (!includeArchived && !includeHidden ? ("public" as const) : undefined);
+
+    if (resolvedScope === "private" && !(await canAccessPrivateCatalog())) {
+      return NextResponse.json(
+        { success: false, error: "يتطلب تسجيل الدخول إلى الهدايا الخاصة" },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
     let data = await getAllProducts(includeArchived, includeHidden, resolvedScope);
     if (!showPrices) {
       data = stripProductsPricesForPublic(data);

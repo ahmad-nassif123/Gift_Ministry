@@ -4,16 +4,18 @@ import {
   safeLocalStorageSetItem,
 } from "@/lib/browser-storage";
 
-export type RememberLoginKind = "dashboard" | "pricing";
+export type RememberLoginKind = "dashboard" | "pricing" | "private";
 
 const REMEMBER_FLAG: Record<RememberLoginKind, string> = {
   dashboard: "gift-catalog-remember-dashboard",
   pricing: "gift-catalog-remember-pricing",
+  private: "gift-catalog-remember-private",
 };
 
 const SAVED_PASSWORD: Record<RememberLoginKind, string> = {
   dashboard: "gift-catalog-saved-dashboard-password",
   pricing: "gift-catalog-saved-pricing-password",
+  private: "gift-catalog-saved-private-password",
 };
 
 export function loadRememberedLogin(kind: RememberLoginKind): { remember: boolean; password: string } {

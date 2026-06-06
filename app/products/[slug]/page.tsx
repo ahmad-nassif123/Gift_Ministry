@@ -25,7 +25,7 @@ import { ProductQRModal } from "@/components/product-qr-modal";
 import { BLUR_DATA_URL } from "@/lib/blur-placeholder";
 import { notifyError } from "@/lib/notify";
 import { safeLocalStorageSetItem } from "@/lib/browser-storage";
-import { fetchPublicCatalogProducts } from "@/lib/fetch-public-products";
+import { fetchCatalogProducts } from "@/lib/fetch-public-products";
 
 interface ProductPageProps {
   params: {
@@ -90,13 +90,23 @@ export default function ProductPage({ params }: ProductPageProps) {
     };
 
     async function load() {
-      const data = await fetchPublicCatalogProducts();
-      if (data) {
-        safeLocalStorageSetItem(PRODUCTS_STORAGE_KEY, JSON.stringify(data));
-        applyList(data);
-        return;
+      let list = (await fetchCatalogProducts("public")) ?? loadPublicProductsFromLocalStorage();
+      let found = list.find(
+        (p) => decodeURIComponent(p.slug) === searchSlug || p.slug === searchSlug
+      );
+
+      if (!found) {
+        const privateList = await fetchCatalogProducts("private");
+        if (privateList) {
+          found = privateList.find(
+            (p) => decodeURIComponent(p.slug) === searchSlug || p.slug === searchSlug
+          );
+          if (found) list = privateList;
+        }
       }
-      applyList(loadPublicProductsFromLocalStorage());
+
+      safeLocalStorageSetItem(PRODUCTS_STORAGE_KEY, JSON.stringify(list));
+      applyList(list);
     }
 
     void load();

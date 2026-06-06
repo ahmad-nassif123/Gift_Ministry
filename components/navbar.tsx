@@ -58,7 +58,7 @@ export function Navbar() {
             href="/login"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            تسجيل الدخول
+            لوحة التحكم
           </Link>
         </div>
 
@@ -106,7 +106,7 @@ export function Navbar() {
                 onClick={() => setIsOpen(false)}
                 className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
-                تسجيل الدخول
+                لوحة التحكم
               </Link>
             </div>
           </SheetContent>
