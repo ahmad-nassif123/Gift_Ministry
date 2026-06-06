@@ -93,10 +93,8 @@ export function verifyPrivateCatalogPassword(password: string): boolean {
   return expected.length > 0 && pass === expected;
 }
 
-/** يمكن لمستخدم الهدايا الخاصة أو مدير لوحة التحكم رؤية الكتالوج الخاص */
+/** يمكن الوصول للكتالوج الخاص فقط بعد إدخال PRIVATE_CATALOG_PASSWORD (كوكي البوابة) */
 export async function canAccessPrivateCatalog(): Promise<boolean> {
-  const { getSession } = await import("@/lib/auth-session");
-  const session = await getSession();
-  if (session) return true;
+  if (!isPrivateCatalogPasswordConfigured()) return false;
   return isPrivateCatalogGateOpen();
 }
