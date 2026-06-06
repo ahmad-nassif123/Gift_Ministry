@@ -13,6 +13,19 @@ function buildSafeFileName(original: string): string {
   return `${timestamp}-${originalName || "image"}`;
 }
 
+function isBlobConfigured(): boolean {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim() || process.env.BLOB_STORE_ID?.trim());
+}
+
+function blobPutOptions() {
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  return {
+    access: "public" as const,
+    addRandomSuffix: false,
+    ...(token ? { token } : {}),
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
@@ -51,13 +64,9 @@ export async function POST(request: NextRequest) {
 
     const fileName = buildSafeFileName(file.name);
 
-    /** على Vercel لا يمكن الكتابة داخل المشروع — نستخدم Blob عند توفر التوكن */
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      const blob = await put(`product-uploads/${fileName}`, file, {
-        access: "public",
-        addRandomSuffix: false,
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      });
+    /** على Vercel: Blob عبر BLOB_STORE_ID (OIDC) أو BLOB_READ_WRITE_TOKEN */
+    if (isBlobConfigured()) {
+      const blob = await put(`product-uploads/${fileName}`, file, blobPutOptions());
       return NextResponse.json({
         success: true,
         message: "تم رفع الصورة بنجاح",
@@ -70,7 +79,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            "رفع الصور على الاستضافة يحتاج Vercel Blob: من لوحة Vercel → مشروعك → Storage → Blob → إنشاء ثم ربط المتغير BLOB_READ_WRITE_TOKEN بالمشروع.",
+            "رفع الصور يحتاج Vercel Blob: من لوحة Vercel → Storage → Blob → أنشئ مخزناً واربطه بمشروع gift-ministry ثم Redeploy.",
         },
         { status: 503 }
       );
